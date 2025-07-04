@@ -1,64 +1,34 @@
 import os
 
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
+from pydantic_settings import BaseSettings
 
 
-class Settings:
-    """Application settings loaded from environment variables."""
+class Settings(BaseSettings):
+    # Supabase configuration
+    supabase_url: str = os.getenv("SUPABASE_URL", "")
+    supabase_key: str = os.getenv("SUPABASE_KEY", "")
+    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
-    # Supabase Configuration
-    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    # Application settings
+    debug: bool = os.getenv("DEBUG", "False").lower() == "true"
+    app_name: str = os.getenv("APP_NAME", "Freelancer PWA API")
+    app_version: str = os.getenv("APP_VERSION", "1.0.0")
+    host: str = os.getenv("HOST", "0.0.0.0")
+    port: str = os.getenv("PORT", "8000")
 
-    # Database Configuration
-    LOCAL_ENVIRONMENT: bool = os.getenv("LOCAL_ENVIRONMENT", "false").lower() == "true"
+    # JWT settings
+    secret_key: str = os.getenv("SECRET_KEY", "your-secret-key-here")
+    algorithm: str = os.getenv("ALGORITHM", "HS256")
+    access_token_expire_minutes: str = os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 
-    # Application Configuration
-    APP_NAME: str = os.getenv("APP_NAME", "Freelancer PWA API")
-    APP_VERSION: str = os.getenv("APP_VERSION", "1.0.0")
-    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
-
-    # Server Configuration
-    HOST: str = os.getenv("HOST", "0.0.0.0")
-    PORT: int = int(os.getenv("PORT", "8000"))
-
-    # Security
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "")
-    ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
-        os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+    # CORS settings
+    allowed_origins: str = os.getenv(
+        "ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"
     )
 
-    # CORS Configuration
-    ALLOWED_ORIGINS: list[str] = os.getenv(
-        "ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"
-    ).split(",")
-
-    @classmethod
-    def validate(cls) -> None:
-        """Validate required environment variables."""
-        required_vars = []
-
-        # Only require Supabase config if not in local environment
-        if not cls.LOCAL_ENVIRONMENT:
-            required_vars.extend(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"])
-
-        # Always require SECRET_KEY
-        required_vars.append("SECRET_KEY")
-
-        missing_vars = []
-        for var in required_vars:
-            if not getattr(cls, var):
-                missing_vars.append(var)
-
-        if missing_vars:
-            raise ValueError(
-                f"Missing required environment variables: {', '.join(missing_vars)}"
-            )
+    class Config:
+        env_file = ".env"
+        extra = "ignore"  # Ignore extra fields instead of raising errors
 
 
-# Create settings instance
 settings = Settings()

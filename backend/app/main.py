@@ -1,70 +1,42 @@
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.middleware import setup_middleware
+from app.api.clients import router as clients_router
+from app.api.meetings import router as meetings_router
+from app.api.profile import router as profile_router
+from app.api.recurrences import router as recurrences_router
+from app.api.services import router as services_router
+from app.api.stats import router as stats_router
 
-# Validate environment variables on startup
-try:
-    settings.validate()
-except ValueError as e:
-    print(f"Configuration error: {e}")
-    exit(1)
-
-# Create FastAPI application
 app = FastAPI(
-    title=settings.APP_NAME,
-    version=settings.APP_VERSION,
-    debug=settings.DEBUG,
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
+    title="Freelancer PWA API",
+    description="API for managing freelancer services, clients, and meetings",
+    version="1.0.0",
 )
 
-# Set up middleware
-setup_middleware(app)
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure appropriately for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include API routers
+app.include_router(services_router, prefix="/services", tags=["services"])
+app.include_router(clients_router, prefix="/clients", tags=["clients"])
+app.include_router(meetings_router, prefix="/meetings", tags=["meetings"])
+app.include_router(profile_router, prefix="/profile", tags=["profile"])
+app.include_router(stats_router, prefix="/stats", tags=["stats"])
+app.include_router(recurrences_router, prefix="/recurrences", tags=["recurrences"])
 
 
 @app.get("/")
 async def root():
-    """Root endpoint with application info."""
-    return {
-        "name": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "status": "running",
-    }
+    return {"message": "Freelancer PWA API"}
 
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "timestamp": "2024-01-01T00:00:00Z",  # TODO: Add proper timestamp
-    }
-
-
-@app.get("/api/v1/health")
-async def api_health_check():
-    """API health check endpoint."""
-    return {"status": "healthy", "api_version": "v1"}
-
-
-# Global exception handler
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    """Global exception handler for unhandled errors."""
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Internal server error",
-            "message": "An unexpected error occurred",
-        },
-    )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "app.main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG
-    )
+    return {"status": "healthy"}

@@ -8,7 +8,7 @@ install: ## Install backend dependencies
 	uv pip install -r requirements.txt
 
 dev: ## Start backend development server
-	source .venv/bin/activate && uvicorn app.main:app --reload
+	source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 build: ## Build backend (compile check)
 	source .venv/bin/activate && python -m py_compile app/main.py
