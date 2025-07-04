@@ -34,8 +34,8 @@ Authentication and user profile management are handled via Supabase's built-in s
 - `profile_picture_url` (optional, stored via Supabase Storage)
 
 ### Endpoints
-- `GET /api/v1/profile/` → Returns current user profile
-- `PUT /api/v1/profile/` → Updates `name` or `profile_picture_url`
+- `GET /api/profile/` → Returns current user profile
+- `PUT /api/profile/` → Updates `name` or `profile_picture_url`
 - Password changes handled via Supabase password reset flow
 
 ### Profile Picture Upload

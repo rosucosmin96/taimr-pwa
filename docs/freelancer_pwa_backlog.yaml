@@ -135,77 +135,77 @@ phases:
             description: Set up new Supabase project and get API keys
             type: infrastructure
             estimated_hours: 0.5
-            status: todo
+            status: done
 
           - id: INFRA-002
             title: Configure Supabase authentication providers
             description: Enable Google, GitHub, and Apple OAuth providers
             type: infrastructure
             estimated_hours: 1
-            status: todo
+            status: done
 
           - id: INFRA-003
             title: Create Supabase storage bucket for avatars
             description: Set up storage bucket with proper permissions
             type: infrastructure
             estimated_hours: 0.5
-            status: todo
+            status: done
 
           - id: INFRA-004
             title: Create environment configuration files
             description: Create .env.example files for both frontend and backend
             type: setup
             estimated_hours: 0.5
-            status: todo
+            status: done
 
           - id: INFRA-005
             title: Set up environment variable loading in backend
             description: Configure python-dotenv and environment validation
             type: backend
             estimated_hours: 0.5
-            status: todo
+            status: done
 
           - id: INFRA-006
             title: Set up environment variable loading in frontend
             description: Configure Vite environment variable handling
             type: frontend
             estimated_hours: 0.25
-            status: todo
+            status: done
 
           - id: INFRA-007
             title: Create Supabase client configuration
             description: Set up Supabase client with environment variables
             type: backend
             estimated_hours: 0.5
-            status: todo
+            status: done
 
           - id: INFRA-008
             title: Implement JWT validation middleware
             description: Create FastAPI dependency for JWT token validation
             type: backend
             estimated_hours: 1
-            status: todo
+            status: done
 
           - id: INFRA-009
             title: Configure CORS middleware
             description: Set up CORS headers for frontend-backend communication
             type: backend
             estimated_hours: 0.5
-            status: todo
+            status: done
 
           - id: INFRA-010
             title: Add security headers middleware
             description: Implement security headers (HSTS, CSP, etc.)
             type: backend
             estimated_hours: 0.5
-            status: todo
+            status: done
 
           - id: INFRA-011
             title: Create error handling middleware
             description: Implement global error handling and logging
             type: backend
             estimated_hours: 1
-            status: todo
+            status: done
 
       - id: EPIC-3
         title: Authentication & User Management

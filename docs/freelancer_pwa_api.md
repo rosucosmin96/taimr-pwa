@@ -4,7 +4,7 @@
 
 The backend API uses RESTful principles and is built with Python (FastAPI preferred for async support). Supabase handles authentication and database access, using JWTs for secure requests.
 
-All endpoints are prefixed with `/api/v1/`. Authentication is required for all endpoints (except `/auth/*`).
+All endpoints are prefixed with `/v1/`. Authentication is required for all endpoints (except `/auth/*`).
 
 ---
 
@@ -18,10 +18,10 @@ All endpoints are prefixed with `/api/v1/`. Authentication is required for all e
 
 ## 2. Services
 
-- `GET /api/v1/services/`
-- `POST /api/v1/services/`
-- `PUT /api/v1/services/{id}`
-- `DELETE /api/v1/services/{id}`
+- `GET /services/`
+- `POST /services/`
+- `PUT /services/{id}`
+- `DELETE /services/{id}`
 
 **Payload (POST/PUT)**:
 
@@ -37,10 +37,10 @@ All endpoints are prefixed with `/api/v1/`. Authentication is required for all e
 
 ## 3. Clients
 
-- `GET /api/v1/clients/?service_id={id}`
-- `POST /api/v1/clients/`
-- `PUT /api/v1/clients/{id}`
-- `DELETE /api/v1/clients/{id}`
+- `GET /clients/?service_id={id}`
+- `POST /clients/`
+- `PUT /clients/{id}`
+- `DELETE /clients/{id}`
 
 **Payload (POST/PUT)**:
 
@@ -59,10 +59,10 @@ All endpoints are prefixed with `/api/v1/`. Authentication is required for all e
 
 ## 4. Meetings
 
-- `GET /api/v1/meetings/?status=upcoming`
-- `POST /api/v1/meetings/`
-- `PUT /api/v1/meetings/{id}`
-- `DELETE /api/v1/meetings/{id}`
+- `GET /meetings/?status=upcoming`
+- `POST /meetings/`
+- `PUT /meetings/{id}`
+- `DELETE /meetings/{id}`
 
 **Payload (POST/PUT)**:
 
@@ -83,9 +83,9 @@ All endpoints are prefixed with `/api/v1/`. Authentication is required for all e
 
 ## 5. Recurrences
 
-- `POST /api/v1/recurrences/`
-- `PUT /api/v1/recurrences/{id}` (applies changes to all future meetings)
-- `DELETE /api/v1/recurrences/{id}`
+- `POST /recurrences/`
+- `PUT /recurrences/{id}` (applies changes to all future meetings)
+- `DELETE /recurrences/{id}`
 
 **Payload (POST)**:
 
@@ -103,8 +103,8 @@ All endpoints are prefixed with `/api/v1/`. Authentication is required for all e
 
 ## 6. Stats
 
-- `GET /api/v1/stats/overview?period=last7days&service_id=...`
-- `GET /api/v1/stats/client/{client_id}`
+- `GET /stats/overview?period=last7days&service_id=...`
+- `GET /stats/client/{client_id}`
 
 **Response** (overview):
 
@@ -123,8 +123,8 @@ All endpoints are prefixed with `/api/v1/`. Authentication is required for all e
 
 ## 7. Profile
 
-- `GET /api/v1/profile/`
-- `PUT /api/v1/profile/`
+- `GET /profile/`
+- `PUT /profile/`
 
 **Payload (PUT)**:
 

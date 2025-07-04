@@ -1,4 +1,4 @@
-.PHONY: help install dev build test lint format clean
+.PHONY: help install dev build test test-setup lint format clean
 
 help: ## Show backend help
 	@echo "Backend commands:"
@@ -8,13 +8,16 @@ install: ## Install backend dependencies
 	uv pip install -r requirements.txt
 
 dev: ## Start backend development server
-	source .venv/bin/activate && uvicorn main:app --reload
+	source .venv/bin/activate && uvicorn app.main:app --reload
 
 build: ## Build backend (compile check)
-	source .venv/bin/activate && python -m py_compile main.py
+	source .venv/bin/activate && python -m py_compile app/main.py
 
 test: ## Run backend tests
 	source .venv/bin/activate && python -m pytest
+
+test-setup: ## Test Epic-2 implementation
+	source .venv/bin/activate && python test_setup.py
 
 lint: ## Run backend linting
 	source .venv/bin/activate && ruff check .

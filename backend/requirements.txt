@@ -11,3 +11,7 @@ starlette==0.46.2
 typing-extensions==4.14.0
 typing-inspection==0.4.1
 uvicorn==0.34.3
+python-dotenv==1.0.0
+supabase==2.8.0
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.9
