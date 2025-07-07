@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -18,6 +19,24 @@ async def get_stats_overview(
 ):
     """Get overview statistics for the current user"""
     return await stats_service.get_overview(user_id, period, service_id)
+
+
+@router.get("/day_stats/{target_date}", response_model=StatsOverview)
+async def get_day_stats(
+    target_date: date,
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """Get statistics for a specific day (only done meetings)"""
+    return await stats_service.get_day_stats(user_id, target_date)
+
+
+@router.get("/week_stats/{target_date}", response_model=StatsOverview)
+async def get_week_stats(
+    target_date: date,
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """Get statistics for the week containing the target date (only done meetings)"""
+    return await stats_service.get_week_stats(user_id, target_date)
 
 
 @router.get("/client/{client_id}", response_model=ClientStatsResponse)

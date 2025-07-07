@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import Dashboard from './pages/Dashboard';
@@ -9,6 +9,7 @@ import Stats from './pages/Stats';
 import Profile from './pages/Profile';
 import Calendar from './pages/Calendar';
 import { ChakraProvider, Box, Flex, IconButton, Text, useBreakpointValue, Drawer, DrawerOverlay, DrawerContent, DrawerCloseButton, DrawerBody, VStack } from '@chakra-ui/react';
+import { apiClient, Profile as UserProfile } from './lib/api';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard' },
@@ -19,12 +20,7 @@ const navItems = [
   { name: 'Calendar', path: '/calendar' },
 ];
 
-const profile = {
-  name: 'Freelancer User',
-  avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-};
-
-function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+function Sidebar({ open, onClose, user }: { open: boolean; onClose: () => void; user?: UserProfile }) {
   const location = useLocation();
   const isDesktop = useBreakpointValue({ base: false, md: true });
   const navLinks = (
@@ -65,9 +61,9 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         onClick={onClose}
       >
         <Box boxSize={8} mr={3}>
-          <img src={profile.avatar} alt={profile.name} style={{ borderRadius: '9999px', width: '100%', height: '100%' }} />
+          <img src={user?.profile_picture_url || 'https://randomuser.me/api/portraits/men/32.jpg'} alt={user?.name || 'User'} style={{ borderRadius: '9999px', width: '100%', height: '100%' }} />
         </Box>
-        <Text fontWeight="medium">{profile.name}</Text>
+        <Text fontWeight="medium">{user?.name || 'User'}</Text>
       </Flex>
     </Box>
   );
@@ -84,6 +80,10 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         direction="column"
         justify="space-between"
         display={{ base: 'none', md: 'flex' }}
+        position="fixed"
+        left={0}
+        top={0}
+        zIndex={100}
       >
         <Box>
           <Text fontWeight="bold" fontSize="xl" mb={6} pl={2}>
@@ -119,10 +119,14 @@ type AppLayoutProps = React.PropsWithChildren<{}>;
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [user, setUser] = useState<UserProfile | undefined>(undefined);
+  useEffect(() => {
+    apiClient.getProfile().then(setUser).catch(() => setUser(undefined));
+  }, []);
   return (
     <Flex minH="100vh" bg="gray.50">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <Flex direction="column" flex="1">
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} />
+      <Flex direction="column" flex="1" ml={{ base: 0, md: '64' }}>
         {/* Top nav for mobile */}
         <Flex
           as="header"

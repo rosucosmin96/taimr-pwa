@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,10 +19,11 @@ meeting_service = MeetingService()
 @router.get("/", response_model=list[MeetingResponse])
 async def get_meetings(
     status: MeetingStatus | None = Query(None),
+    date_filter: date | None = Query(None, alias="date"),
     user_id: UUID = Depends(get_current_user_id),
 ):
-    """Get meetings for the current user, optionally filtered by status"""
-    return await meeting_service.get_meetings(user_id, status)
+    """Get meetings for the current user, optionally filtered by status and date"""
+    return await meeting_service.get_meetings(user_id, status, date_filter)
 
 
 @router.post("/", response_model=MeetingResponse)
