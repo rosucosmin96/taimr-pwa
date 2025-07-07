@@ -1,0 +1,1124 @@
+project:
+  name: Freelancer Management PWA
+  goal: Help freelancers manage services, clients, meetings, and analytics
+  mvp: true
+  version: 1.0
+
+phases:
+  - id: PHASE-1
+    title: Foundation
+    description: Core infrastructure, security, and development environment setup
+    priority: must-have
+    epics:
+      - id: EPIC-1
+        title: Development Environment & Tooling
+        description: Set up development workflow, tooling, and code quality standards
+        priority: must-have
+        key_points:
+          - Project repository setup with monorepo structure
+          - Development environment configuration (Python, Node.js)
+          - Code quality tools (linting, formatting, pre-commit hooks)
+          - CI/CD pipeline foundation
+          - Documentation and README setup
+        tasks:
+          - id: ENV-001
+            title: Create GitHub repository with monorepo structure
+            description: Initialize repository with /frontend and /backend folders
+            type: setup
+            estimated_hours: 0.5
+            status: done
+
+          - id: ENV-002
+            title: Create root .gitignore file
+            description: Add common ignore patterns for both frontend and backend
+            type: setup
+            estimated_hours: 0.25
+            status: done
+
+          - id: ENV-003
+            title: Create project README.md
+            description: Add project overview, setup instructions, and architecture notes
+            type: documentation
+            estimated_hours: 1
+            status: done
+
+          - id: ENV-004
+            title: Set up Python virtual environment for backend
+            description: Use UV to create venv and install base dependencies (FastAPI, uvicorn)
+            type: backend
+            estimated_hours: 0.5
+            status: done
+
+          - id: ENV-005
+            title: Create backend requirements.txt
+            description: Define Python dependencies with versions
+            type: backend
+            estimated_hours: 0.25
+            status: done
+
+          - id: ENV-006
+            title: Set up Node.js environment for frontend
+            description: Initialize package.json and install base dependencies
+            type: frontend
+            estimated_hours: 0.5
+            status: done
+
+          - id: ENV-007
+            title: Create frontend package.json
+            description: Define React, Vite, and other frontend dependencies
+            type: frontend
+            estimated_hours: 0.25
+            status: done
+
+          - id: ENV-008
+            title: Configure ESLint for frontend
+            description: Set up linting rules and configuration
+            type: frontend
+            estimated_hours: 0.5
+            status: done
+
+          - id: ENV-009
+            title: Configure Prettier for frontend
+            description: Set up code formatting rules
+            type: frontend
+            estimated_hours: 0.25
+            status: done
+
+          - id: ENV-010
+            title: Configure Black for backend
+            description: Set up Python code formatting
+            type: backend
+            estimated_hours: 0.25
+            status: done
+
+          - id: ENV-011
+            title: Configure Flake8 for backend
+            description: Set up Python linting rules
+            type: backend
+            estimated_hours: 0.25
+            status: done
+
+          - id: ENV-012
+            title: Set up pre-commit hooks
+            description: Configure git hooks for code quality checks
+            type: setup
+            estimated_hours: 0.5
+            status: done
+
+          - id: ENV-013
+            title: Create development scripts
+            description: Add npm scripts for development workflow
+            type: frontend
+            estimated_hours: 0.25
+            status: done
+
+          - id: ENV-014
+            title: Create backend development scripts
+            description: Add Python scripts for development workflow
+            type: backend
+            estimated_hours: 0.25
+            status: done
+
+      - id: EPIC-2
+        title: Core Infrastructure & Security
+        description: Set up Supabase, security middleware, and environment configuration
+        priority: must-have
+        key_points:
+          - Supabase project setup and configuration
+          - Row-Level Security (RLS) policies implementation
+          - API security middleware and JWT validation
+          - Environment variable management
+          - CORS and security headers configuration
+        tasks:
+          - id: INFRA-001
+            title: Create Supabase project
+            description: Set up new Supabase project and get API keys
+            type: infrastructure
+            estimated_hours: 0.5
+            status: done
+
+          - id: INFRA-002
+            title: Configure Supabase authentication providers
+            description: Enable Google, GitHub, and Apple OAuth providers
+            type: infrastructure
+            estimated_hours: 1
+            status: done
+
+          - id: INFRA-003
+            title: Create Supabase storage bucket for avatars
+            description: Set up storage bucket with proper permissions
+            type: infrastructure
+            estimated_hours: 0.5
+            status: done
+
+          - id: INFRA-004
+            title: Create environment configuration files
+            description: Create .env.example files for both frontend and backend
+            type: setup
+            estimated_hours: 0.5
+            status: done
+
+          - id: INFRA-005
+            title: Set up environment variable loading in backend
+            description: Configure python-dotenv and environment validation
+            type: backend
+            estimated_hours: 0.5
+            status: done
+
+          - id: INFRA-006
+            title: Set up environment variable loading in frontend
+            description: Configure Vite environment variable handling
+            type: frontend
+            estimated_hours: 0.25
+            status: done
+
+          - id: INFRA-007
+            title: Create Supabase client configuration
+            description: Set up Supabase client with environment variables
+            type: backend
+            estimated_hours: 0.5
+            status: done
+
+          - id: INFRA-008
+            title: Implement JWT validation middleware
+            description: Create FastAPI dependency for JWT token validation
+            type: backend
+            estimated_hours: 1
+            status: done
+
+          - id: INFRA-009
+            title: Configure CORS middleware
+            description: Set up CORS headers for frontend-backend communication
+            type: backend
+            estimated_hours: 0.5
+            status: done
+
+          - id: INFRA-010
+            title: Add security headers middleware
+            description: Implement security headers (HSTS, CSP, etc.)
+            type: backend
+            estimated_hours: 0.5
+            status: done
+
+          - id: INFRA-011
+            title: Create error handling middleware
+            description: Implement global error handling and logging
+            type: backend
+            estimated_hours: 1
+            status: done
+
+      - id: EPIC-3
+        title: Authentication & User Management
+        description: Implement secure authentication and user profile management
+        priority: must-have
+        key_points:
+          - Supabase authentication integration (Google, GitHub, Apple)
+          - Auth context and protected routes implementation
+          - User profile management (name, avatar)
+          - Password reset and account management
+          - Session management and token handling
+        tasks:
+          - id: AUTH-001
+            title: Install Supabase JS SDK in frontend
+            description: Add @supabase/supabase-js dependency
+            type: frontend
+            estimated_hours: 0.25
+            status: todo
+
+          - id: AUTH-002
+            title: Create Supabase client configuration in frontend
+            description: Initialize Supabase client with environment variables
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: AUTH-003
+            title: Create AuthContext provider
+            description: Implement React context for authentication state
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: AUTH-004
+            title: Implement login component
+            description: Create login form with social provider buttons
+            type: frontend
+            estimated_hours: 1.5
+            status: todo
+
+          - id: AUTH-005
+            title: Implement logout functionality
+            description: Add logout button and session cleanup
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: AUTH-006
+            title: Create protected route wrapper
+            description: Implement HOC for route protection
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: AUTH-007
+            title: Implement session persistence
+            description: Handle session storage and refresh logic
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: AUTH-008
+            title: Create profile API endpoint (GET)
+            description: Implement GET /api/v1/profile endpoint
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: AUTH-009
+            title: Create profile API endpoint (PUT)
+            description: Implement PUT /api/v1/profile endpoint
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: AUTH-010
+            title: Create profile page component
+            description: Build profile management UI
+            type: frontend
+            estimated_hours: 1.5
+            status: todo
+
+          - id: AUTH-011
+            title: Implement profile picture upload
+            description: Add file upload to Supabase storage
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: AUTH-012
+            title: Add password reset functionality
+            description: Implement password reset flow
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+      - id: EPIC-4
+        title: Data Access Layer & Repository Pattern
+        description: Create clean data access abstraction and repository interfaces
+        priority: must-have
+        key_points:
+          - Database connection management
+          - Repository interfaces and implementations
+          - Data validation and error handling
+          - Query optimization and caching strategy
+          - Database migration and seeding
+        tasks:
+          - id: DATA-001
+            title: Create database connection manager
+            description: Implement Supabase connection handling
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: DATA-002
+            title: Create base repository interface
+            description: Define common CRUD operations interface
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: DATA-003
+            title: Create base repository implementation
+            description: Implement common CRUD operations
+            type: backend
+            estimated_hours: 1
+            status: todo
+
+          - id: DATA-004
+            title: Create data validation schemas
+            description: Define Pydantic models for data validation
+            type: backend
+            estimated_hours: 1
+            status: todo
+
+          - id: DATA-005
+            title: Implement error handling for data operations
+            description: Create custom exceptions and error responses
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: DATA-006
+            title: Create database migration scripts
+            description: Write SQL scripts for schema creation
+            type: backend
+            estimated_hours: 1
+            status: todo
+
+          - id: DATA-007
+            title: Implement database seeding
+            description: Create seed data for development
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: DATA-008
+            title: Add query optimization utilities
+            description: Create helper functions for common queries
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+  - id: PHASE-2
+    title: Core Business Logic
+    description: Implement core business functionality and domain logic
+    priority: must-have
+    epics:
+      - id: EPIC-5
+        title: Services Management
+        description: CRUD operations and business rules for service management
+        priority: must-have
+        key_points:
+          - Services CRUD API endpoints
+          - Service-based business rules and validation
+          - Service pricing and duration defaults
+          - Service-client relationship management
+          - Service filtering and search functionality
+        tasks:
+          - id: SERVICE-001
+            title: Create services repository
+            description: Implement services data access layer
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: SERVICE-002
+            title: Create service data models
+            description: Define Pydantic models for service entities
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: SERVICE-003
+            title: Implement GET /api/v1/services endpoint
+            description: Create endpoint to list user services
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: SERVICE-004
+            title: Implement POST /api/v1/services endpoint
+            description: Create endpoint to create new service
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: SERVICE-005
+            title: Implement PUT /api/v1/services/{id} endpoint
+            description: Create endpoint to update existing service
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: SERVICE-006
+            title: Implement DELETE /api/v1/services/{id} endpoint
+            description: Create endpoint to delete service
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: SERVICE-007
+            title: Add service validation rules
+            description: Implement business validation for services
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: SERVICE-008
+            title: Create service filtering logic
+            description: Implement search and filter functionality
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+      - id: EPIC-6
+        title: Clients Management
+        description: Client management with service relationships and custom settings
+        priority: must-have
+        key_points:
+          - Clients CRUD API endpoints
+          - Client-service relationship management
+          - Client-specific pricing and duration overrides
+          - Client contact information management
+          - Client filtering and search functionality
+        tasks:
+          - id: CLIENT-001
+            title: Create clients repository
+            description: Implement clients data access layer
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CLIENT-002
+            title: Create client data models
+            description: Define Pydantic models for client entities
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CLIENT-003
+            title: Implement GET /api/v1/clients endpoint
+            description: Create endpoint to list user clients with service filtering
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CLIENT-004
+            title: Implement POST /api/v1/clients endpoint
+            description: Create endpoint to create new client
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CLIENT-005
+            title: Implement PUT /api/v1/clients/{id} endpoint
+            description: Create endpoint to update existing client
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CLIENT-006
+            title: Implement DELETE /api/v1/clients/{id} endpoint
+            description: Create endpoint to delete client
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CLIENT-007
+            title: Add client validation rules
+            description: Implement business validation for clients
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CLIENT-008
+            title: Create client-service relationship logic
+            description: Implement client filtering by service
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CLIENT-009
+            title: Implement client defaults logic
+            description: Create logic for client-specific pricing/duration overrides
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+      - id: EPIC-7
+        title: Meetings Business Logic
+        description: Core meeting management with recurrence and state handling
+        priority: must-have
+        key_points:
+          - Meetings CRUD API endpoints
+          - Meeting state management (upcoming, done, canceled)
+          - Recurrence algorithm implementation
+          - Meeting pricing calculations
+          - Meeting validation and business rules
+        tasks:
+          - id: MEETING-001
+            title: Create meetings repository
+            description: Implement meetings data access layer
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: MEETING-002
+            title: Create meeting data models
+            description: Define Pydantic models for meeting entities
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: MEETING-003
+            title: Implement GET /api/v1/meetings endpoint
+            description: Create endpoint to list meetings with filtering
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: MEETING-004
+            title: Implement POST /api/v1/meetings endpoint
+            description: Create endpoint to create new meeting
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: MEETING-005
+            title: Implement PUT /api/v1/meetings/{id} endpoint
+            description: Create endpoint to update existing meeting
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: MEETING-006
+            title: Implement DELETE /api/v1/meetings/{id} endpoint
+            description: Create endpoint to delete meeting
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: MEETING-007
+            title: Create meeting state management
+            description: Implement status transitions (upcoming, done, canceled)
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: MEETING-008
+            title: Implement meeting pricing calculation
+            description: Create logic to calculate total price based on duration and rate
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: MEETING-009
+            title: Add meeting validation rules
+            description: Implement business validation for meetings
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: MEETING-010
+            title: Create meeting filtering logic
+            description: Implement filtering by status, date, client, service
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+      - id: EPIC-8
+        title: Calendar Business Logic
+        description: Date/time calculations and calendar data aggregation
+        priority: must-have
+        key_points:
+          - Date/time calculation utilities
+          - Recurrence generation algorithms
+          - Calendar data aggregation and optimization
+          - Timezone handling and conversion
+          - Calendar slot availability logic
+        tasks:
+          - id: CALENDAR-001
+            title: Create date/time utility functions
+            description: Implement helper functions for date calculations
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CALENDAR-002
+            title: Implement timezone handling
+            description: Create timezone conversion utilities
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CALENDAR-003
+            title: Create recurrence generation algorithm
+            description: Implement logic to generate recurring meetings
+            type: backend
+            estimated_hours: 1
+            status: todo
+
+          - id: CALENDAR-004
+            title: Create calendar data aggregation
+            description: Implement logic to aggregate meetings for calendar views
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CALENDAR-005
+            title: Implement calendar slot availability
+            description: Create logic to check slot availability
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CALENDAR-006
+            title: Create calendar API endpoint
+            description: Implement GET /api/v1/calendar endpoint
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+  - id: PHASE-3
+    title: User Interface
+    description: Build responsive UI components and application pages
+    priority: must-have
+    epics:
+      - id: EPIC-9
+        title: State Management & Data Flow
+        description: Implement global state management and data fetching strategies
+        priority: must-have
+        key_points:
+          - Global state architecture design
+          - Data fetching and caching strategies
+          - Optimistic updates implementation
+          - Error state management
+          - Loading state handling
+        tasks:
+          - id: STATE-001
+            title: Install React Query
+            description: Add @tanstack/react-query dependency
+            type: frontend
+            estimated_hours: 0.25
+            status: todo
+
+          - id: STATE-002
+            title: Create React Query client configuration
+            description: Set up React Query with default options
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: STATE-003
+            title: Create API service layer
+            description: Implement service functions for API calls
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: STATE-004
+            title: Create custom hooks for data fetching
+            description: Implement useQuery hooks for each entity
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: STATE-005
+            title: Implement optimistic updates
+            description: Add optimistic update logic for mutations
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: STATE-006
+            title: Create error boundary component
+            description: Implement error boundary for error handling
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: STATE-007
+            title: Create loading state components
+            description: Implement loading spinners and skeletons
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+      - id: EPIC-10
+        title: Core UI Components
+        description: Build reusable UI components and design system foundation
+        priority: must-have
+        key_points:
+          - Design system foundation and tokens
+          - Reusable form components
+          - Modal and dialog components
+          - Navigation and layout components
+          - Responsive design implementation
+        tasks:
+          - id: UI-001
+            title: Set up TailwindCSS configuration
+            description: Configure TailwindCSS with custom theme
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: UI-002
+            title: Create design tokens
+            description: Define colors, spacing, typography tokens
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: UI-003
+            title: Create Button component
+            description: Implement reusable button with variants
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: UI-004
+            title: Create Input component
+            description: Implement reusable input field
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: UI-005
+            title: Create Modal component
+            description: Implement reusable modal dialog
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: UI-006
+            title: Create Card component
+            description: Implement reusable card container
+            type: frontend
+            estimated_hours: 0.25
+            status: todo
+
+          - id: UI-007
+            title: Create Badge component
+            description: Implement status badge component
+            type: frontend
+            estimated_hours: 0.25
+            status: todo
+
+          - id: UI-008
+            title: Create Dropdown component
+            description: Implement reusable dropdown/select
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: UI-009
+            title: Create Layout component
+            description: Implement main layout wrapper
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: UI-010
+            title: Create Navigation component
+            description: Implement sidebar/navigation menu
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+      - id: EPIC-11
+        title: Calendar UI Components
+        description: Interactive calendar interface with meeting visualization
+        priority: must-have
+        key_points:
+          - Week and day view calendar components
+          - Interactive calendar slot interactions
+          - Meeting card visualization
+          - Calendar navigation and controls
+          - Drag-and-drop scheduling interface
+        tasks:
+          - id: CAL-UI-001
+            title: Create Calendar container component
+            description: Implement main calendar wrapper
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CAL-UI-002
+            title: Create Week view component
+            description: Implement 7-day calendar view
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: CAL-UI-003
+            title: Create Day view component
+            description: Implement single day calendar view
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CAL-UI-004
+            title: Create Calendar slot component
+            description: Implement individual time slot component
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CAL-UI-005
+            title: Create Meeting card component
+            description: Implement meeting visualization card
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CAL-UI-006
+            title: Create Calendar navigation controls
+            description: Implement previous/next week/day buttons
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CAL-UI-007
+            title: Implement click-to-create functionality
+            description: Add click handlers for empty slots
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: CAL-UI-008
+            title: Create calendar view toggle
+            description: Implement week/day view switching
+            type: frontend
+            estimated_hours: 0.25
+            status: todo
+
+      - id: EPIC-12
+        title: Application Pages
+        description: Main application pages and navigation structure
+        priority: must-have
+        key_points:
+          - Dashboard overview page
+          - Services, clients, and meetings management pages
+          - Navigation and routing implementation
+          - Page layouts and responsive design
+          - Breadcrumb and navigation helpers
+        tasks:
+          - id: PAGE-001
+            title: Set up React Router
+            description: Configure routing with protected routes
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: PAGE-002
+            title: Create Dashboard page
+            description: Implement main dashboard with KPIs
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: PAGE-003
+            title: Create Services page
+            description: Implement services list and management
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: PAGE-004
+            title: Create Clients page
+            description: Implement clients list and management
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: PAGE-005
+            title: Create Meetings page
+            description: Implement meetings list and management
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: PAGE-006
+            title: Create Calendar page
+            description: Implement calendar view page
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: PAGE-007
+            title: Create Profile page
+            description: Implement user profile management page
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: PAGE-008
+            title: Create 404 error page
+            description: Implement not found page
+            type: frontend
+            estimated_hours: 0.25
+            status: todo
+
+          - id: PAGE-009
+            title: Add breadcrumb navigation
+            description: Implement breadcrumb component
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+  - id: PHASE-4
+    title: Advanced Features
+    description: Analytics, error handling, and production readiness
+    priority: should-have
+    epics:
+      - id: EPIC-13
+        title: Statistics & Analytics
+        description: Business intelligence and performance analytics
+        priority: should-have
+        key_points:
+          - Analytics data aggregation
+          - KPI calculation and reporting
+          - Client performance breakdown
+          - Revenue and time tracking
+          - Chart and visualization components
+        tasks:
+          - id: STATS-001
+            title: Create stats repository
+            description: Implement data access for analytics
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: STATS-002
+            title: Implement overview stats calculation
+            description: Create logic for KPI calculations
+            type: backend
+            estimated_hours: 1
+            status: todo
+
+          - id: STATS-003
+            title: Create GET /api/v1/stats/overview endpoint
+            description: Implement overview statistics endpoint
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: STATS-004
+            title: Create GET /api/v1/stats/client/{id} endpoint
+            description: Implement client-specific stats endpoint
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: STATS-005
+            title: Install chart library
+            description: Add Recharts or similar charting library
+            type: frontend
+            estimated_hours: 0.25
+            status: todo
+
+          - id: STATS-006
+            title: Create Stats page
+            description: Implement statistics overview page
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+          - id: STATS-007
+            title: Create KPI cards component
+            description: Implement metric display cards
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: STATS-008
+            title: Create charts component
+            description: Implement data visualization charts
+            type: frontend
+            estimated_hours: 1
+            status: todo
+
+      - id: EPIC-14
+        title: Error Handling & Observability
+        description: Comprehensive error handling and application monitoring
+        priority: should-have
+        key_points:
+          - Error boundaries and fallback UI
+          - Logging strategy and error tracking
+          - Performance monitoring and metrics
+          - User feedback and error reporting
+          - Debugging and troubleshooting tools
+        tasks:
+          - id: ERROR-001
+            title: Implement global error boundary
+            description: Create error boundary for React app
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: ERROR-002
+            title: Create error logging service
+            description: Implement error tracking and logging
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: ERROR-003
+            title: Add performance monitoring
+            description: Implement basic performance tracking
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: ERROR-004
+            title: Create user feedback system
+            description: Implement toast notifications and feedback
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: ERROR-005
+            title: Add debugging utilities
+            description: Create development debugging tools
+            type: frontend
+            estimated_hours: 0.5
+            status: todo
+
+      - id: EPIC-15
+        title: Deployment & Production
+        description: Production deployment and performance optimization
+        priority: must-have
+        key_points:
+          - Production environment setup
+          - Performance optimization and caching
+          - Security hardening and best practices
+          - Monitoring and alerting setup
+          - Backup and disaster recovery
+        tasks:
+          - id: DEPLOY-001
+            title: Set up Render backend service
+            description: Configure Python service on Render
+            type: devops
+            estimated_hours: 1
+            status: todo
+
+          - id: DEPLOY-002
+            title: Set up Render frontend service
+            description: Configure static site deployment on Render
+            type: devops
+            estimated_hours: 1
+            status: todo
+
+          - id: DEPLOY-003
+            title: Configure production environment variables
+            description: Set up production environment configuration
+            type: devops
+            estimated_hours: 0.5
+            status: todo
+
+          - id: DEPLOY-004
+            title: Set up CI/CD pipeline
+            description: Configure automatic deployment from GitHub
+            type: devops
+            estimated_hours: 1
+            status: todo
+
+          - id: DEPLOY-005
+            title: Implement performance optimization
+            description: Add caching and optimization strategies
+            type: backend
+            estimated_hours: 1
+            status: todo
+
+          - id: DEPLOY-006
+            title: Add security hardening
+            description: Implement production security measures
+            type: backend
+            estimated_hours: 0.5
+            status: todo
+
+          - id: DEPLOY-007
+            title: Set up monitoring and logging
+            description: Configure production monitoring
+            type: devops
+            estimated_hours: 0.5
+            status: todo
+
+          - id: DEPLOY-008
+            title: Create backup strategy
+            description: Implement database backup procedures
+            type: devops
+            estimated_hours: 0.5
+            status: todo
+
+# Tasks will be added to each epic in subsequent updates

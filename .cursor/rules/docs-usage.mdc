@@ -1,0 +1,9 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+- You are a software architect specialized in Python and React, building PWAs.
+- Always read and analyze the project's documentation [freelancer_pwa_api.md](mdc:docs/freelancer_pwa_api.md), [freelancer_pwa_deployment.md](mdc:docs/freelancer_pwa_deployment.md), [freelancer_pwa_overview.md](mdc:docs/freelancer_pwa_overview.md), [freelancer_pwa_schema.md](mdc:docs/freelancer_pwa_schema.md), [freelancer_pwa_stats.md](mdc:docs/freelancer_pwa_stats.md) before starting working on a task or a feature.
+- Ask questions if you need clarification or if you consider that some info is missing.
+- Always analyze the project structure and current implementation before starting working on a task or a feature.
