@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from uuid import UUID
 
 from app.api.stats.model import (
@@ -59,6 +59,55 @@ class StatsService:
     ) -> StatsOverview:
         """Get overview statistics for a user"""
         return self.mock_overview
+
+    async def get_day_stats(self, user_id: UUID, target_date: date) -> StatsOverview:
+        """Get statistics for a specific day (only done meetings)"""
+        # Mock data for today's stats
+        today = date.today()
+        if target_date == today:
+            return StatsOverview(
+                total_meetings=3,
+                done_meetings=1,
+                canceled_meetings=1,
+                total_clients=2,
+                total_revenue=120.0,
+                total_hours=1.5,
+            )
+        else:
+            return StatsOverview(
+                total_meetings=0,
+                done_meetings=0,
+                canceled_meetings=0,
+                total_clients=0,
+                total_revenue=0.0,
+                total_hours=0.0,
+            )
+
+    async def get_week_stats(self, user_id: UUID, target_date: date) -> StatsOverview:
+        """Get statistics for the week containing the target date (only done meetings)"""
+        # Mock data for current week stats
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+        week_end = week_start + timedelta(days=6)
+
+        if week_start <= target_date <= week_end:
+            return StatsOverview(
+                total_meetings=8,
+                done_meetings=6,
+                canceled_meetings=1,
+                total_clients=4,
+                total_revenue=480.0,
+                total_hours=9.0,
+            )
+        else:
+            return StatsOverview(
+                total_meetings=0,
+                done_meetings=0,
+                canceled_meetings=0,
+                total_clients=0,
+                total_revenue=0.0,
+                total_hours=0.0,
+            )
 
     async def get_client_stats(
         self, user_id: UUID, client_id: UUID

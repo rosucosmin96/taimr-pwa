@@ -14,6 +14,7 @@ class MeetingStatus(str, Enum):
 class MeetingBase(BaseModel):
     service_id: UUID
     client_id: UUID
+    title: str | None = None
     recurrence_id: UUID | None = None
     start_time: datetime
     end_time: datetime
@@ -29,6 +30,7 @@ class MeetingCreateRequest(MeetingBase):
 class MeetingUpdateRequest(BaseModel):
     service_id: UUID | None = None
     client_id: UUID | None = None
+    title: str | None = None
     recurrence_id: UUID | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None

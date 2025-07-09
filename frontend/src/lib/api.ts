@@ -29,6 +29,7 @@ export interface Meeting {
   user_id: string;
   service_id: string;
   client_id: string;
+  title?: string;
   recurrence_id?: string;
   start_time: string;
   end_time: string;
@@ -169,14 +170,18 @@ class ApiClient {
   }
 
   // Meetings API
-  async getMeetings(status?: 'upcoming' | 'done' | 'canceled'): Promise<Meeting[]> {
-    const params = status ? `?status=${status}` : '';
-    return this.request<Meeting[]>(`/meetings/${params}`);
+  async getMeetings(status?: 'upcoming' | 'done' | 'canceled', date?: string): Promise<Meeting[]> {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (date) params.append('date', date);
+    const queryString = params.toString();
+    return this.request<Meeting[]>(`/meetings/${queryString ? `?${queryString}` : ''}`);
   }
 
   async createMeeting(data: {
     service_id: string;
     client_id: string;
+    title?: string;
     recurrence_id?: string;
     start_time: string;
     end_time: string;
@@ -193,6 +198,7 @@ class ApiClient {
   async updateMeeting(id: string, data: Partial<{
     service_id: string;
     client_id: string;
+    title: string;
     recurrence_id: string;
     start_time: string;
     end_time: string;
@@ -232,6 +238,14 @@ class ApiClient {
     const params = new URLSearchParams({ period });
     if (serviceId) params.append('service_id', serviceId);
     return this.request<StatsOverview>(`/stats/overview?${params}`);
+  }
+
+  async getDayStats(targetDate: string): Promise<StatsOverview> {
+    return this.request<StatsOverview>(`/stats/day_stats/${targetDate}`);
+  }
+
+  async getWeekStats(targetDate: string): Promise<StatsOverview> {
+    return this.request<StatsOverview>(`/stats/week_stats/${targetDate}`);
   }
 }
 

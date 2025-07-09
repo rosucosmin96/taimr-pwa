@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import StatsCard from '../components/StatsCard';
+import DailyCalendar from '../components/DailyCalendar';
 import { CalendarDaysIcon, UserGroupIcon, CurrencyDollarIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { Box, Grid, Heading, Text, Flex, Stack, Spinner, Alert, AlertIcon } from '@chakra-ui/react';
-import { apiClient, StatsOverview, Meeting } from '../lib/api';
+import { apiClient, StatsOverview, Meeting, Profile } from '../lib/api';
 
 interface KPI {
   title: string;
   value: string | number;
+  weeklyValue: string | number;
   icon: React.ReactElement;
   color: string;
 }
 
 const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState<StatsOverview | null>(null);
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [todayStats, setTodayStats] = useState<StatsOverview | null>(null);
+  const [weekStats, setWeekStats] = useState<StatsOverview | null>(null);
+  const [todayMeetings, setTodayMeetings] = useState<Meeting[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,12 +25,17 @@ const Dashboard: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [statsData, meetingsData] = await Promise.all([
-          apiClient.getStatsOverview(),
-          apiClient.getMeetings('upcoming')
+        const today = new Date().toISOString().split('T')[0];
+        const [todayStatsData, weekStatsData, meetingsData, profileData] = await Promise.all([
+          apiClient.getDayStats(today),
+          apiClient.getWeekStats(today),
+          apiClient.getMeetings(undefined, today),
+          apiClient.getProfile()
         ]);
-        setStats(statsData);
-        setMeetings(meetingsData);
+        setTodayStats(todayStatsData);
+        setWeekStats(weekStatsData);
+        setTodayMeetings(meetingsData);
+        setProfile(profileData);
       } catch (err) {
         setError('Failed to load dashboard data');
         console.error('Dashboard data fetch error:', err);
@@ -34,7 +43,6 @@ const Dashboard: React.FC = () => {
         setLoading(false);
       }
     };
-
     fetchData();
   }, []);
 
@@ -63,112 +71,66 @@ const Dashboard: React.FC = () => {
 
   const kpis: KPI[] = [
     {
-      title: 'Total Revenue',
-      value: `$${stats?.total_revenue.toFixed(2) || '0.00'}`,
+      title: 'Today\'s Revenue',
+      value: `$${todayStats?.total_revenue.toFixed(2) || '0.00'}`,
+      weeklyValue: `$${weekStats?.total_revenue.toFixed(2) || '0.00'} this week`,
       icon: <CurrencyDollarIcon style={{ width: 28, height: 28 }} color="#38A169" />,
       color: 'green.100'
     },
     {
-      title: 'Total Clients',
-      value: stats?.total_clients || 0,
-      icon: <UserGroupIcon style={{ width: 28, height: 28 }} color="#3182CE" />,
-      color: 'blue.100'
-    },
-    {
-      title: 'Upcoming Meetings',
-      value: meetings.length,
+      title: 'Today\'s Meetings',
+      value: todayStats?.total_meetings || 0,
+      weeklyValue: `${weekStats?.total_meetings || 0} this week`,
       icon: <CalendarDaysIcon style={{ width: 28, height: 28 }} color="#805AD5" />,
       color: 'purple.100'
     },
     {
-      title: 'Total Hours',
-      value: stats?.total_hours || 0,
+      title: 'Today\'s Upcoming',
+      value: todayMeetings.filter(m => m.status === 'upcoming').length,
+      weeklyValue: `${weekStats?.done_meetings || 0} completed this week`,
       icon: <ClockIcon style={{ width: 28, height: 28 }} color="#D69E2E" />,
       color: 'yellow.100'
     },
+    {
+      title: 'Total Clients',
+      value: todayStats?.total_clients || 0,
+      weeklyValue: `${weekStats?.total_clients || 0} this week`,
+      icon: <UserGroupIcon style={{ width: 28, height: 28 }} color="#3182CE" />,
+      color: 'blue.100'
+    },
   ];
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
 
   return (
     <Stack spacing={8} px={{ base: 2, md: 8 }} py={4}>
       <Heading as="h1" size="lg" mb={2}>Dashboard</Heading>
-
+      {profile?.name && (
+        <Text fontSize="xl" color="gray.700" mb={2}>
+          Congrats for this day, {profile.name}! Make the most of it!
+        </Text>
+      )}
       {/* KPI Cards */}
       <Grid templateColumns={{ base: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }} gap={4}>
         {kpis.map((kpi) => (
-          <StatsCard key={kpi.title} title={kpi.title} value={kpi.value} icon={kpi.icon} color={kpi.color} />
+          <Box key={kpi.title} bg="white" rounded="xl" shadow="md" p={6}>
+            <Flex align="center" justify="space-between" mb={3}>
+              <Box p={2} rounded="lg" bg={kpi.color}>
+                {kpi.icon}
+              </Box>
+            </Flex>
+            <Text fontSize="2xl" fontWeight="bold" mb={1}>
+              {kpi.value}
+            </Text>
+            <Text fontSize="sm" color="gray.600" mb={2}>
+              {kpi.title}
+            </Text>
+            <Text fontSize="xs" color="gray.500">
+              {kpi.weeklyValue}
+            </Text>
+          </Box>
         ))}
       </Grid>
-
-      {/* Calendar Preview & Upcoming Meetings */}
-      <Flex direction={{ base: 'column', md: 'row' }} bg="white" rounded="xl" shadow="md" p={6} gap={6}>
-        <Box flex="1" bg="gray.50" rounded="lg" p={4} boxShadow="sm" mb={{ base: 4, md: 0 }}>
-          <Text fontWeight="semibold" fontSize="lg" mb={2}>Today</Text>
-          <Flex gap={2} mb={4}>
-            {[6,7,8,9,10].map((d, i) => (
-              <Flex key={d} direction="column" align="center" px={3} py={2} rounded="lg" bg={i===1 ? 'purple.400' : 'gray.100'} color={i===1 ? 'white' : 'gray.700'} minW={10}>
-                <Text fontSize="xs" fontWeight="medium">{['Sat','Sun','Mon','Tue','Wed'][i]}</Text>
-                <Text fontSize="lg" fontWeight="bold">{d}</Text>
-              </Flex>
-            ))}
-          </Flex>
-          <Stack spacing={2}>
-            {meetings.slice(0, 3).map((meeting) => (
-              <Flex key={meeting.id} align="center" gap={2}>
-                <Box w={3} h={3} rounded="full" bg="green.400" as="span" />
-                <Text fontSize="sm">
-                  Meeting - {formatTime(meeting.start_time)}
-                </Text>
-              </Flex>
-            ))}
-            {meetings.length === 0 && (
-              <Text fontSize="sm" color="gray.500">No upcoming meetings today</Text>
-            )}
-          </Stack>
-        </Box>
-
-        {/* Upcoming Meetings */}
-        <Box flex="1" bg="gray.50" rounded="lg" p={4} boxShadow="sm">
-          <Text fontWeight="semibold" fontSize="lg" mb={2}>Upcoming Meetings</Text>
-          <Stack spacing={4}>
-            {meetings.slice(0, 3).map((meeting) => (
-              <Box key={meeting.id} bg="white" rounded="lg" p={4} shadow="sm">
-                <Flex align="center" justify="space-between">
-                  <Text fontWeight="medium">Meeting</Text>
-                  <Text fontSize="xs" color="gray.500">
-                    {formatDate(meeting.start_time)} at {formatTime(meeting.start_time)}
-                  </Text>
-                </Flex>
-                <Text fontSize="sm" color="gray.600" mt={1}>
-                  ${meeting.price_total.toFixed(2)} • {meeting.status}
-                </Text>
-              </Box>
-            ))}
-            {meetings.length === 0 && (
-              <Text fontSize="sm" color="gray.500" textAlign="center" py={4}>
-                No upcoming meetings
-              </Text>
-            )}
-          </Stack>
-        </Box>
-      </Flex>
+      {/* Daily Calendar */}
+      <DailyCalendar meetings={todayMeetings} />
     </Stack>
   );
 };

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID, uuid4
 
 from app.api.meetings.model import (
@@ -11,20 +11,26 @@ from app.api.meetings.model import (
 
 class MeetingService:
     def __init__(self):
-        # Mock data
+        # Mock data with today's date
+        today = date.today()
         self.mock_meetings = [
             MeetingResponse(
                 id=UUID("77777777-7777-7777-7777-777777777777"),
                 user_id=UUID("00000000-0000-0000-0000-000000000000"),
                 service_id=UUID("11111111-1111-1111-1111-111111111111"),
                 client_id=UUID("44444444-4444-4444-4444-444444444444"),
+                title="Consultation-John Doe",
                 recurrence_id=None,
-                start_time=datetime(2024, 3, 15, 14, 0, 0),
-                end_time=datetime(2024, 3, 15, 16, 0, 0),
+                start_time=datetime.combine(
+                    today, datetime.min.time().replace(hour=9, minute=0)
+                ),
+                end_time=datetime.combine(
+                    today, datetime.min.time().replace(hour=10, minute=30)
+                ),
                 price_per_hour=80.0,
-                price_total=160.0,
-                status=MeetingStatus.UPCOMING,
-                paid=False,
+                price_total=120.0,
+                status=MeetingStatus.DONE,
+                paid=True,
                 created_at=datetime(2024, 3, 1, 10, 0, 0),
             ),
             MeetingResponse(
@@ -32,13 +38,18 @@ class MeetingService:
                 user_id=UUID("00000000-0000-0000-0000-000000000000"),
                 service_id=UUID("22222222-2222-2222-2222-222222222222"),
                 client_id=UUID("55555555-5555-5555-5555-555555555555"),
+                title="Design-Jane Smith",
                 recurrence_id=None,
-                start_time=datetime(2024, 3, 10, 10, 0, 0),
-                end_time=datetime(2024, 3, 10, 11, 30, 0),
+                start_time=datetime.combine(
+                    today, datetime.min.time().replace(hour=14, minute=0)
+                ),
+                end_time=datetime.combine(
+                    today, datetime.min.time().replace(hour=15, minute=0)
+                ),
                 price_per_hour=60.0,
-                price_total=90.0,
-                status=MeetingStatus.DONE,
-                paid=True,
+                price_total=60.0,
+                status=MeetingStatus.UPCOMING,
+                paid=False,
                 created_at=datetime(2024, 3, 5, 9, 0, 0),
             ),
             MeetingResponse(
@@ -46,26 +57,65 @@ class MeetingService:
                 user_id=UUID("00000000-0000-0000-0000-000000000000"),
                 service_id=UUID("33333333-3333-3333-3333-333333333333"),
                 client_id=UUID("66666666-6666-6666-6666-666666666666"),
+                title="Development-Mike Johnson",
                 recurrence_id=None,
-                start_time=datetime(2024, 3, 20, 15, 0, 0),
-                end_time=datetime(2024, 3, 20, 16, 0, 0),
+                start_time=datetime.combine(
+                    today, datetime.min.time().replace(hour=16, minute=30)
+                ),
+                end_time=datetime.combine(
+                    today, datetime.min.time().replace(hour=18, minute=0)
+                ),
                 price_per_hour=110.0,
-                price_total=110.0,
+                price_total=165.0,
                 status=MeetingStatus.UPCOMING,
                 paid=False,
                 created_at=datetime(2024, 3, 8, 14, 0, 0),
             ),
+            MeetingResponse(
+                id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                user_id=UUID("00000000-0000-0000-0000-000000000000"),
+                service_id=UUID("11111111-1111-1111-1111-111111111111"),
+                client_id=UUID("44444444-4444-4444-4444-444444444444"),
+                title="Consultation-John Doe",
+                recurrence_id=None,
+                start_time=datetime.combine(
+                    today, datetime.min.time().replace(hour=11, minute=0)
+                ),
+                end_time=datetime.combine(
+                    today, datetime.min.time().replace(hour=12, minute=0)
+                ),
+                price_per_hour=80.0,
+                price_total=80.0,
+                status=MeetingStatus.CANCELED,
+                paid=False,
+                created_at=datetime(2024, 3, 1, 10, 0, 0),
+            ),
         ]
 
     async def get_meetings(
-        self, user_id: UUID, status: MeetingStatus | None = None
+        self,
+        user_id: UUID,
+        status: MeetingStatus | None = None,
+        date_filter: date | None = None,
     ) -> list[MeetingResponse]:
-        """Get meetings for a user, optionally filtered by status"""
-        if status:
-            return [
-                meeting for meeting in self.mock_meetings if meeting.status == status
+        """Get meetings for a user, optionally filtered by status and date"""
+        filtered_meetings = self.mock_meetings
+
+        # Filter by date if provided
+        if date_filter:
+            filtered_meetings = [
+                meeting
+                for meeting in filtered_meetings
+                if meeting.start_time.date() == date_filter
             ]
-        return self.mock_meetings
+
+        # Filter by status if provided
+        if status:
+            filtered_meetings = [
+                meeting for meeting in filtered_meetings if meeting.status == status
+            ]
+
+        return filtered_meetings
 
     async def create_meeting(
         self, user_id: UUID, meeting: MeetingCreateRequest
@@ -79,6 +129,7 @@ class MeetingService:
             user_id=user_id,
             service_id=meeting.service_id,
             client_id=meeting.client_id,
+            title=meeting.title,
             recurrence_id=meeting.recurrence_id,
             start_time=meeting.start_time,
             end_time=meeting.end_time,
@@ -101,6 +152,8 @@ class MeetingService:
                     existing_meeting.service_id = meeting.service_id
                 if meeting.client_id is not None:
                     existing_meeting.client_id = meeting.client_id
+                if meeting.title is not None:
+                    existing_meeting.title = meeting.title
                 if meeting.recurrence_id is not None:
                     existing_meeting.recurrence_id = meeting.recurrence_id
                 if meeting.start_time is not None:
