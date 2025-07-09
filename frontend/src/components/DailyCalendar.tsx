@@ -292,7 +292,7 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
                     hour: 'numeric',
                     minute: '2-digit',
                     hour12: true
-                  })} - {endTime.toLocaleTimeString('en-US', {
+                  })} – {endTime.toLocaleTimeString('en-US', {
                     hour: 'numeric',
                     minute: '2-digit',
                     hour12: true
