@@ -1,10 +1,9 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from uuid import UUID
 
 from app.api.stats.model import (
     ClientStats,
     ClientStatsResponse,
-    PeriodType,
     StatsOverview,
 )
 
@@ -54,60 +53,34 @@ class StatsService:
     async def get_overview(
         self,
         user_id: UUID,
-        period: PeriodType = PeriodType.LAST_7_DAYS,
+        start_date: date | None = None,
+        end_date: date | None = None,
         service_id: UUID | None = None,
     ) -> StatsOverview:
-        """Get overview statistics for a user"""
-        return self.mock_overview
+        """Get overview statistics for a user.
+        If no dates provided, returns all-time stats.
+        If dates provided, returns stats for the specified period."""
 
-    async def get_day_stats(self, user_id: UUID, target_date: date) -> StatsOverview:
-        """Get statistics for a specific day (only done meetings)"""
-        # Mock data for today's stats
-        today = date.today()
-        if target_date == today:
-            return StatsOverview(
-                total_meetings=3,
-                done_meetings=1,
-                canceled_meetings=1,
-                total_clients=2,
-                total_revenue=120.0,
-                total_hours=1.5,
-            )
-        else:
-            return StatsOverview(
-                total_meetings=0,
-                done_meetings=0,
-                canceled_meetings=0,
-                total_clients=0,
-                total_revenue=0.0,
-                total_hours=0.0,
-            )
+        # For now, return mock data
+        # In a real implementation, you would:
+        # 1. Query the database based on the date range
+        # 2. Filter by service_id if provided
+        # 3. Calculate statistics from the actual data
 
-    async def get_week_stats(self, user_id: UUID, target_date: date) -> StatsOverview:
-        """Get statistics for the week containing the target date (only done meetings)"""
-        # Mock data for current week stats
-        today = date.today()
-        week_start = today - timedelta(days=today.weekday())
-        week_end = week_start + timedelta(days=6)
-
-        if week_start <= target_date <= week_end:
+        if start_date and end_date:
+            # Custom period - return filtered data
+            # This is where you'd implement date filtering logic
             return StatsOverview(
                 total_meetings=8,
                 done_meetings=6,
                 canceled_meetings=1,
-                total_clients=4,
+                total_clients=3,
                 total_revenue=480.0,
                 total_hours=9.0,
             )
         else:
-            return StatsOverview(
-                total_meetings=0,
-                done_meetings=0,
-                canceled_meetings=0,
-                total_clients=0,
-                total_revenue=0.0,
-                total_hours=0.0,
-            )
+            # All-time stats (default)
+            return self.mock_overview
 
     async def get_client_stats(
         self, user_id: UUID, client_id: UUID
