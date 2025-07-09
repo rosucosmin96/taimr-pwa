@@ -29,6 +29,8 @@ import {
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, FormControl, FormLabel
 } from '@chakra-ui/react';
 import { apiClient, Service } from '../lib/api';
+import ServiceModal from '../components/ServiceModal';
+import ServiceViewModal from '../components/ServiceViewModal';
 
 // Filter types
 interface Filters {
@@ -43,6 +45,9 @@ const Services: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Modal states
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
 
   // Filter states
@@ -182,6 +187,28 @@ const Services: React.FC = () => {
     } else {
       setSelectedServiceIds(filteredServices.map(s => s.id));
     }
+  };
+
+  const handleAddService = () => {
+    setIsAddModalOpen(true);
+  };
+
+  const handleServiceClick = (service: Service) => {
+    setSelectedService(service);
+    setIsViewModalOpen(true);
+  };
+
+  const handleModalSuccess = () => {
+    fetchData(); // Refresh data after successful operation
+  };
+
+  const handleAddModalClose = () => {
+    setIsAddModalOpen(false);
+  };
+
+  const handleViewModalClose = () => {
+    setIsViewModalOpen(false);
+    setSelectedService(null);
   };
 
   const handleSearchChange = (value: string) => {
@@ -349,19 +376,34 @@ const Services: React.FC = () => {
             leftIcon={<Cog6ToothIcon style={{ width: 20, height: 20 }} />}
             colorScheme="purple"
             borderRadius="lg"
+            onClick={handleAddService}
           >
             Add Service
           </Button>
         </Flex>
         <Stack divider={<Box borderBottomWidth={1} borderColor="gray.100" />}>
           {filteredServices.map((service) => (
-            <Flex key={service.id} align="center" justify="space-between" py={4}>
+            <Flex
+              key={service.id}
+              align="center"
+              justify="space-between"
+              py={4}
+              cursor="pointer"
+              _hover={{ bg: 'gray.50' }}
+              onClick={() => handleServiceClick(service)}
+              transition="background-color 0.2s"
+            >
               <HStack>
-                <Checkbox
-                  isChecked={selectedServiceIds.includes(service.id)}
-                  onChange={() => handleSelectService(service.id)}
-                  mr={4}
-                />
+                <Box onClick={e => e.stopPropagation()}>
+                  <Checkbox
+                    isChecked={selectedServiceIds.includes(service.id)}
+                    onChange={e => {
+                      e.stopPropagation();
+                      handleSelectService(service.id);
+                    }}
+                    mr={4}
+                  />
+                </Box>
                 <Box>
                   <Text fontWeight="medium" color="gray.900">{service.name}</Text>
                   <Text fontSize="sm" color="gray.500">
@@ -373,7 +415,15 @@ const Services: React.FC = () => {
                 <Badge colorScheme="green" px={2} py={1} borderRadius="full" display="flex" alignItems="center" fontSize="sm">
                   <CheckCircleIcon style={{ width: 18, height: 18, marginRight: 4 }} />Active
                 </Badge>
-                <IconButton aria-label="Edit" icon={<PencilSquareIcon style={{ width: 20, height: 20 }} />} variant="ghost" />
+                <IconButton
+                  aria-label="Edit"
+                  icon={<PencilSquareIcon style={{ width: 20, height: 20 }} />}
+                  variant="ghost"
+                  onClick={e => {
+                    e.stopPropagation();
+                    handleServiceClick(service);
+                  }}
+                />
               </Flex>
             </Flex>
           ))}
@@ -438,6 +488,21 @@ const Services: React.FC = () => {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Add Service Modal */}
+      <ServiceModal
+        isOpen={isAddModalOpen}
+        onClose={handleAddModalClose}
+        onSuccess={handleModalSuccess}
+      />
+
+      {/* View/Edit Service Modal */}
+      <ServiceViewModal
+        isOpen={isViewModalOpen}
+        onClose={handleViewModalClose}
+        onSuccess={handleModalSuccess}
+        service={selectedService}
+      />
     </Stack>
   );
 };
