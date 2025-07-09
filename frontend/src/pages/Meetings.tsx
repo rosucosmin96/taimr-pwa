@@ -483,26 +483,28 @@ const Meetings: React.FC = () => {
               onClick={() => handleMeetingClick(meeting)}
               transition="background-color 0.2s"
             >
-              <HStack onClick={e => e.stopPropagation()}>
-                <Checkbox
-                  isChecked={selectedMeetingIds.includes(meeting.id)}
-                  onChange={e => {
-                    e.stopPropagation();
-                    handleSelectMeeting(meeting.id);
-                  }}
-                  mr={4}
-                />
+              <HStack>
+                <Box onClick={e => e.stopPropagation()}>
+                  <Checkbox
+                    isChecked={selectedMeetingIds.includes(meeting.id)}
+                    onChange={e => {
+                      e.stopPropagation();
+                      handleSelectMeeting(meeting.id);
+                    }}
+                    mr={4}
+                  />
+                </Box>
                 <Avatar name={getClientName(meeting.client_id)} size="md" bg="purple.500" />
+                <Box>
+                  <Text fontWeight="medium" color="gray.900">{getClientName(meeting.client_id)}</Text>
+                  <Text fontSize="sm" color="gray.500">
+                    {getServiceName(meeting.service_id)} &bull; {formatDateTime(meeting.start_time)}
+                  </Text>
+                  <Text fontSize="sm" color="gray.600" mt={1}>
+                    ${meeting.price_total.toFixed(2)} • {meeting.paid ? 'Paid' : 'Unpaid'}
+                  </Text>
+                </Box>
               </HStack>
-              <Box>
-                <Text fontWeight="medium" color="gray.900">{getClientName(meeting.client_id)}</Text>
-                <Text fontSize="sm" color="gray.500">
-                  {getServiceName(meeting.service_id)} &bull; {formatDateTime(meeting.start_time)}
-                </Text>
-                <Text fontSize="sm" color="gray.600" mt={1}>
-                  ${meeting.price_total.toFixed(2)} • {meeting.paid ? 'Paid' : 'Unpaid'}
-                </Text>
-              </Box>
               <Badge px={3} py={1} borderRadius="full" fontSize="xs" bg={statusStyles[meeting.status].bg} color={statusStyles[meeting.status].color} display="flex" alignItems="center">
                 {statusStyles[meeting.status].icon}{meeting.status}
               </Badge>
