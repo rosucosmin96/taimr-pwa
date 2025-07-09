@@ -31,7 +31,6 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
   const LEFT_MARGIN = 80;
   const COLUMN_GAP = 8;
   const [containerWidth, setContainerWidth] = useState(600);
-  const calendarRef = useRef<HTMLDivElement>(null);
 
   const startHour = showFullDay ? FULL_DAY_START : DEFAULT_START_HOUR;
   const endHour = showFullDay ? FULL_DAY_END : DEFAULT_END_HOUR;
@@ -58,19 +57,19 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
   };
 
   useEffect(() => {
-    // Scroll to the current time slot on mount or when interval changes
-    if (scrollRef.current && currentTimeSlotRef.current) {
+    // Scroll to the current time line on mount or when interval changes
+    if (scrollRef.current) {
       const container = scrollRef.current;
-      const slot = currentTimeSlotRef.current;
-      // Center the slot in the visible area
-      const offset = slot.offsetTop - VISIBLE_HEIGHT / 2 + SLOT_HEIGHT;
+      const currentTimeY = getCurrentTimeY();
+      // Center the current time line in the visible area
+      const offset = currentTimeY - VISIBLE_HEIGHT / 2;
       container.scrollTop = Math.max(offset, 0);
     }
   }, [showFullDay]);
 
   useEffect(() => {
-    if (calendarRef.current) {
-      setContainerWidth(calendarRef.current.offsetWidth);
+    if (scrollRef.current) {
+      setContainerWidth(scrollRef.current.offsetWidth);
     }
   }, [showFullDay]);
 
@@ -209,7 +208,7 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
         </Button>
       </Flex>
       <Box
-        ref={calendarRef}
+        ref={scrollRef}
         position="relative"
         height={VISIBLE_HEIGHT + 'px'}
         overflowY="auto"
