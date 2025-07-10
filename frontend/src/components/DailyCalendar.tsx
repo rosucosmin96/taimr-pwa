@@ -3,6 +3,7 @@ import { Box, Text, Flex, VStack, Button, Icon } from '@chakra-ui/react';
 import { Meeting } from '../lib/api';
 import MeetingModal from './MeetingModal';
 import MeetingViewModal from './MeetingViewModal';
+import { useContainerWidth } from '../lib/useContainerWidth';
 
 interface DailyCalendarProps {
   meetings: Meeting[];
@@ -20,17 +21,30 @@ const FULL_DAY_END = 23;
 const SLOT_HEIGHT = 40; // px
 const VISIBLE_HOURS = 8;
 const VISIBLE_HEIGHT = SLOT_HEIGHT * 2 * VISIBLE_HOURS; // 2 slots per hour
+const GUTTER_WIDTH = 64; // px, fixed gutter for time labels
+const MIN_MEETING_WIDTH = 120; // px
 
 const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
   const [showFullDay, setShowFullDay] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const currentTimeSlotRef = useRef<HTMLDivElement>(null);
-  const LEFT_MARGIN = 80;
   const COLUMN_GAP = 8;
-  const [containerWidth, setContainerWidth] = useState(600);
+  const [containerRef, containerWidth] = useContainerWidth<HTMLDivElement>();
+
+  // Remove leftMargin state and logic
+
+  useEffect(() => {
+    // Scroll to the current time line on mount or when interval changes
+    if (containerRef.current) {
+      const container = containerRef.current;
+      const currentTimeY = getCurrentTimeY();
+      // Center the current time line in the visible area
+      const offset = currentTimeY - VISIBLE_HEIGHT / 2;
+      container.scrollTop = Math.max(offset, 0);
+    }
+  }, [showFullDay, containerRef, containerWidth]);
 
   const startHour = showFullDay ? FULL_DAY_START : DEFAULT_START_HOUR;
   const endHour = showFullDay ? FULL_DAY_END : DEFAULT_END_HOUR;
@@ -58,20 +72,14 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
 
   useEffect(() => {
     // Scroll to the current time line on mount or when interval changes
-    if (scrollRef.current) {
-      const container = scrollRef.current;
+    if (containerRef.current) {
+      const container = containerRef.current;
       const currentTimeY = getCurrentTimeY();
       // Center the current time line in the visible area
       const offset = currentTimeY - VISIBLE_HEIGHT / 2;
       container.scrollTop = Math.max(offset, 0);
     }
-  }, [showFullDay]);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      setContainerWidth(scrollRef.current.offsetWidth);
-    }
-  }, [showFullDay]);
+  }, [showFullDay, containerRef, containerWidth]);
 
   const getMeetingColor = (status: string) => {
     switch (status) {
@@ -208,12 +216,15 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
         </Button>
       </Flex>
       <Box
-        ref={scrollRef}
+        ref={containerRef}
         position="relative"
         height={VISIBLE_HEIGHT + 'px'}
         overflowY="auto"
         bg="gray.50"
         rounded="lg"
+        width="100%"
+        minWidth={MIN_MEETING_WIDTH + GUTTER_WIDTH + 16 + 'px'} // ensure min width for meeting blocks
+        style={{ overflowX: 'hidden' }}
       >
         {/* Current time indicator */}
         <Box
@@ -240,7 +251,7 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
               {slot.minute === 0 && (
                 <Text
                   position="absolute"
-                  left="8px"
+                  left={GUTTER_WIDTH / 8 + 'px'}
                   top="2px"
                   fontSize="xs"
                   color="gray.500"
@@ -258,15 +269,18 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
           const startTime = new Date(meeting.start_time);
           const endTime = new Date(meeting.end_time);
           const colInfo = meetingColumns[meeting.id] || { col: 0, colCount: 1 };
-          const availableWidth = Math.max(0, containerWidth - LEFT_MARGIN);
-          const colWidth = colInfo.colCount > 0 ? (availableWidth - (colInfo.colCount - 1) * COLUMN_GAP) / colInfo.colCount : availableWidth;
-          const leftOffset = LEFT_MARGIN + colInfo.col * (colWidth + COLUMN_GAP);
+          // Responsive available width
+          const availableWidth = Math.max(0, containerWidth - GUTTER_WIDTH - 16); // 16px for padding
+          const colWidth = colInfo.colCount > 0 ? Math.max(MIN_MEETING_WIDTH, (availableWidth - (colInfo.colCount - 1) * COLUMN_GAP) / colInfo.colCount) : availableWidth;
+          const leftOffset = GUTTER_WIDTH + colInfo.col * (colWidth + COLUMN_GAP);
           return (
             <Box
               key={meeting.id}
               position="absolute"
               left={leftOffset + 'px'}
-              width={colWidth + 'px'}
+              width={`calc(${colWidth}px)`}
+              maxWidth={`calc(100% - ${leftOffset}px)`}
+              minWidth={MIN_MEETING_WIDTH + 'px'}
               top={top + 'px'}
               height={height + 'px'}
               bg={getMeetingColor(meeting.status)}
@@ -278,16 +292,17 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
               cursor="pointer"
               _hover={{ opacity: 0.8, transform: 'scale(1.02)' }}
               transition="all 0.2s"
+              overflow="hidden"
               onClick={() => {
                 setSelectedMeeting(meeting);
                 setIsViewModalOpen(true);
               }}
             >
               <VStack spacing={1} align="start">
-                <Text fontSize="xs" fontWeight="semibold" color="white">
+                <Text fontSize="xs" fontWeight="semibold" color="white" noOfLines={1}>
                   {meeting.title || 'Meeting'}
                 </Text>
-                <Text fontSize="xs" color="white" opacity={0.9}>
+                <Text fontSize="xs" color="white" opacity={0.9} noOfLines={1}>
                   {startTime.toLocaleTimeString('en-US', {
                     hour: 'numeric',
                     minute: '2-digit',
@@ -298,7 +313,7 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
                     hour12: true
                   })}
                 </Text>
-                <Text fontSize="xs" color="white" opacity={0.8}>
+                <Text fontSize="xs" color="white" opacity={0.8} noOfLines={1}>
                   ${meeting.price_total.toFixed(2)}
                 </Text>
               </VStack>
