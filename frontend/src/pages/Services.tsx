@@ -412,18 +412,7 @@ const Services: React.FC = () => {
                 </Box>
               </HStack>
               <Flex align="center" gap={4}>
-                <Badge colorScheme="green" px={2} py={1} borderRadius="full" display="flex" alignItems="center" fontSize="sm">
-                  <CheckCircleIcon style={{ width: 18, height: 18, marginRight: 4 }} />Active
-                </Badge>
-                <IconButton
-                  aria-label="Edit"
-                  icon={<PencilSquareIcon style={{ width: 20, height: 20 }} />}
-                  variant="ghost"
-                  onClick={e => {
-                    e.stopPropagation();
-                    handleServiceClick(service);
-                  }}
-                />
+                {/* Removed the 'Active' badge, as there is no real status field */}
               </Flex>
             </Flex>
           ))}
