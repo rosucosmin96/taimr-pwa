@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Text, Flex, VStack, Button, HStack, Popover, PopoverTrigger, PopoverContent, PopoverBody, SimpleGrid, IconButton } from '@chakra-ui/react';
+import { Box, Text, Flex, VStack, Button, HStack, Popover, PopoverTrigger, PopoverContent, PopoverBody, SimpleGrid, IconButton, useBreakpointValue, Select } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { Meeting } from '../lib/api';
@@ -39,6 +39,10 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const currentTimeSlotRef = useRef<HTMLDivElement>(null);
 
+  // Responsive breakpoints
+  const isMobile = useBreakpointValue({ base: true, md: false });
+  const isWeekView = useBreakpointValue({ base: false, md: true });
+
   const startHour = showFullDay ? FULL_DAY_START : DEFAULT_START_HOUR;
   const endHour = showFullDay ? FULL_DAY_END : DEFAULT_END_HOUR;
 
@@ -49,38 +53,57 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
     }
   }
 
-  // Get days for week view
-  const getWeekDays = (date: Date): DayInfo[] => {
-    const days: DayInfo[] = [];
-    const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - date.getDay());
+  // Get days for week view or single day for mobile
+  const getDays = (date: Date): DayInfo[] => {
+    if (isWeekView) {
+      // Week view for desktop
+      const days: DayInfo[] = [];
+      const startOfWeek = new Date(date);
+      startOfWeek.setDate(date.getDate() - date.getDay());
 
-    for (let i = 0; i < 7; i++) {
-      const dayDate = new Date(startOfWeek);
-      dayDate.setDate(startOfWeek.getDate() + i);
+      for (let i = 0; i < 7; i++) {
+        const dayDate = new Date(startOfWeek);
+        dayDate.setDate(startOfWeek.getDate() + i);
+        const today = new Date();
+
+        days.push({
+          date: dayDate,
+          label: dayDate.toLocaleDateString('en-US', { weekday: 'short' }),
+          isToday: dayDate.toDateString() === today.toDateString()
+        });
+      }
+      return days;
+    } else {
+      // Single day view for mobile
       const today = new Date();
-
-      days.push({
-        date: dayDate,
-        label: dayDate.toLocaleDateString('en-US', { weekday: 'short' }),
-        isToday: dayDate.toDateString() === today.toDateString()
-      });
+      return [{
+        date: date,
+        label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        isToday: date.toDateString() === today.toDateString()
+      }];
     }
-    return days;
   };
 
-  const days = getWeekDays(currentDate);
+  const days = getDays(currentDate);
 
-  // Navigation functions
+  // Navigation functions - updated for responsive behavior
   const goToPrevious = () => {
     const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() - 7);
+    if (isWeekView) {
+      newDate.setDate(currentDate.getDate() - 7);
+    } else {
+      newDate.setDate(currentDate.getDate() - 1);
+    }
     setCurrentDate(newDate);
   };
 
   const goToNext = () => {
     const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() + 7);
+    if (isWeekView) {
+      newDate.setDate(currentDate.getDate() + 7);
+    } else {
+      newDate.setDate(currentDate.getDate() + 1);
+    }
     setCurrentDate(newDate);
   };
 
@@ -165,18 +188,78 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
     );
   }
 
-  // Filter meetings for the current week (local date only)
-  const getFilteredMeetings = () => {
-    const startOfWeek = new Date(days[0].date);
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(days[6].date);
-    endOfWeek.setHours(23, 59, 59, 999);
+  // --- Overlap detection and column assignment ---
+  // Given a list of meetings for a day, assign each a column index and total columns
+  function assignMeetingColumns(dayMeetings: Meeting[]) {
+    // Sort by start time
+    const sorted = [...dayMeetings].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    // Each item: { meeting, columns: number, col: number }
+    const result: Array<{ meeting: Meeting; col: number; columns: number }> = [];
+    const active: Array<{ meeting: Meeting; col: number }> = [];
 
-    return meetings.filter(meeting => {
-      const meetingDate = new Date(meeting.start_time);
-      // Use only the local date for comparison
-      return meetingDate >= startOfWeek && meetingDate <= endOfWeek;
-    });
+    for (const meeting of sorted) {
+      const start = new Date(meeting.start_time).getTime();
+      const end = new Date(meeting.end_time).getTime();
+      // Remove finished meetings from active
+      for (let i = active.length - 1; i >= 0; i--) {
+        const aEnd = new Date(active[i].meeting.end_time).getTime();
+        if (aEnd <= start) active.splice(i, 1);
+      }
+      // Find available columns
+      const usedCols = new Set(active.map(a => a.col));
+      let col = 0;
+      while (usedCols.has(col)) col++;
+      active.push({ meeting, col });
+      // The number of columns is max(active.length, ...)
+      result.push({ meeting, col, columns: active.length });
+    }
+    // After assignment, for each meeting, find the max columns it overlaps with
+    // (so all meetings in the same overlap group have the same columns value)
+    for (let i = 0; i < result.length; i++) {
+      const m = result[i];
+      const mStart = new Date(m.meeting.start_time).getTime();
+      const mEnd = new Date(m.meeting.end_time).getTime();
+      let maxCols = m.columns;
+      for (let j = 0; j < result.length; j++) {
+        if (i === j) continue;
+        const n = result[j];
+        const nStart = new Date(n.meeting.start_time).getTime();
+        const nEnd = new Date(n.meeting.end_time).getTime();
+        // If overlap
+        if (nStart < mEnd && nEnd > mStart) {
+          maxCols = Math.max(maxCols, n.columns);
+        }
+      }
+      m.columns = maxCols;
+    }
+    return result;
+  }
+
+  // Filter meetings for the current view
+  const getFilteredMeetings = () => {
+    if (isWeekView) {
+      // Week view filtering
+      const startOfWeek = new Date(days[0].date);
+      startOfWeek.setHours(0, 0, 0, 0);
+      const endOfWeek = new Date(days[6].date);
+      endOfWeek.setHours(23, 59, 59, 999);
+
+      return meetings.filter(meeting => {
+        const meetingDate = new Date(meeting.start_time);
+        return meetingDate >= startOfWeek && meetingDate <= endOfWeek;
+      });
+    } else {
+      // Single day filtering for mobile
+      const startOfDay = new Date(days[0].date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(days[0].date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      return meetings.filter(meeting => {
+        const meetingDate = new Date(meeting.start_time);
+        return meetingDate >= startOfDay && meetingDate <= endOfDay;
+      });
+    }
   };
 
   const filteredMeetings = getFilteredMeetings();
@@ -208,143 +291,176 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  // For date picker state
+  const [pickerMonth, setPickerMonth] = useState(currentDate.getMonth());
+  const [pickerYear, setPickerYear] = useState(currentDate.getFullYear());
+  useEffect(() => {
+    setPickerMonth(currentDate.getMonth());
+    setPickerYear(currentDate.getFullYear());
+  }, [isDatePickerOpen, currentDate]);
+
   return (
-    <Box bg="white" rounded="xl" shadow="md" p={6}>
-      {/* Header with navigation */}
-      <Flex align="center" justify="space-between" mb={4}>
-        <HStack spacing={2}>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={goToPrevious}
-            leftIcon={<ChevronLeftIcon style={{ width: 16, height: 16 }} />}
-          >
-            Previous Week
-          </Button>
-
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={goToNext}
-            rightIcon={<ChevronRightIcon style={{ width: 16, height: 16 }} />}
-          >
-            Next Week
-          </Button>
-
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={resetToToday}
-            leftIcon={<CalendarIcon style={{ width: 16, height: 16 }} />}
-          >
-            This Week
-          </Button>
-        </HStack>
-
+    <Box bg="white" rounded="xl" shadow="md" p={6} minW="360px" maxW="100%">
+      {/* Responsive Header with navigation */}
+      <VStack spacing={4} mb={4} align="stretch">
+        {/* New Meeting button always on top, full width */}
         <Button
           size="sm"
           colorScheme="purple"
           leftIcon={<PlusIcon style={{ width: 18, height: 18 }} />}
           onClick={onAddMeeting}
+          width="100%"
         >
           New Meeting
         </Button>
-      </Flex>
-
-      {/* Month and Year Display - Centered */}
-      <Flex justify="center" mb={4}>
-        <Popover
-          isOpen={isDatePickerOpen}
-          onOpen={() => setIsDatePickerOpen(true)}
-          onClose={() => setIsDatePickerOpen(false)}
-        >
-          <PopoverTrigger>
+        {/* Navigation buttons - always below New Meeting, centered */}
+        <Flex width="100%" justify="center">
+          <HStack spacing={2}>
             <Button
-              variant="ghost"
-              size="lg"
-              rightIcon={<ChevronDownIcon style={{ width: 16, height: 16 }} />}
-              _hover={{ bg: 'gray.100' }}
+              size="sm"
+              variant="outline"
+              onClick={goToPrevious}
+              leftIcon={<ChevronLeftIcon style={{ width: 16, height: 16 }} />}
             >
-              <Text fontSize="xl" fontWeight="bold" color="gray.700">
-                {currentDate.toLocaleDateString('en-US', {
-                  month: 'long',
-                  year: 'numeric'
-                })}
-              </Text>
+              {isWeekView ? 'Previous Week' : 'Previous Day'}
             </Button>
-          </PopoverTrigger>
-          <PopoverContent width="300px">
-            <PopoverBody p={4}>
-              <VStack spacing={4} align="stretch">
-                {/* Year Selection */}
-                <Box>
-                  <Text fontSize="sm" fontWeight="semibold" mb={2}>Year</Text>
-                  <SimpleGrid columns={3} spacing={2}>
-                    {years.map((year) => (
-                      <Button
-                        key={year}
-                        size="sm"
-                        variant={currentDate.getFullYear() === year ? "solid" : "outline"}
-                        colorScheme={currentDate.getFullYear() === year ? "purple" : "gray"}
-                        onClick={() => {
-                          const newDate = new Date(currentDate);
-                          newDate.setFullYear(year);
-                          setCurrentDate(newDate);
-                        }}
-                      >
-                        {year}
-                      </Button>
-                    ))}
-                  </SimpleGrid>
-                </Box>
-
-                {/* Month Selection */}
-                <Box>
-                  <Text fontSize="sm" fontWeight="semibold" mb={2}>Month</Text>
-                  <SimpleGrid columns={3} spacing={2}>
-                    {months.map((month, index) => (
-                      <Button
-                        key={index}
-                        size="sm"
-                        variant={currentDate.getMonth() === index ? "solid" : "outline"}
-                        colorScheme={currentDate.getMonth() === index ? "purple" : "gray"}
-                        onClick={() => {
-                          const newDate = new Date(currentDate);
-                          newDate.setMonth(index);
-                          setCurrentDate(newDate);
-                        }}
-                      >
-                        {month}
-                      </Button>
-                    ))}
-                  </SimpleGrid>
-                </Box>
-              </VStack>
-            </PopoverBody>
-          </PopoverContent>
-        </Popover>
-      </Flex>
-
-      {/* Day headers */}
-      <Flex mb={2}>
-        <Box width="80px" flexShrink={0} />
-        {days.map((day, index) => (
-          <Box
-            key={index}
-            flex={1}
-            textAlign="center"
-            py={2}
-            bg={day.isToday ? 'blue.50' : 'transparent'}
-            color={day.isToday ? 'blue.700' : 'gray.700'}
-            fontWeight={day.isToday ? 'bold' : 'normal'}
-            rounded="md"
-            mx={1}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={goToNext}
+              rightIcon={<ChevronRightIcon style={{ width: 16, height: 16 }} />}
+            >
+              {isWeekView ? 'Next Week' : 'Next Day'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={resetToToday}
+              leftIcon={<CalendarIcon style={{ width: 16, height: 16 }} />}
+            >
+              {isWeekView ? 'This Week' : 'Today'}
+            </Button>
+          </HStack>
+        </Flex>
+        {/* Month, Year, and Day Display - Centered for day view, month/year for week view */}
+        <Flex justify="center">
+          <Popover
+            isOpen={isDatePickerOpen}
+            onOpen={() => setIsDatePickerOpen(true)}
+            onClose={() => setIsDatePickerOpen(false)}
           >
-            <Text fontSize="xs" fontWeight="medium">{day.label}</Text>
-            <Text fontSize="lg" fontWeight="bold">{day.date.getDate()}</Text>
-          </Box>
-        ))}
-      </Flex>
+            <PopoverTrigger>
+              <Button
+                variant="ghost"
+                size="lg"
+                rightIcon={<ChevronDownIcon style={{ width: 16, height: 16 }} />}
+                _hover={{ bg: 'gray.100' }}
+              >
+                <Text fontSize="xl" fontWeight="bold" color="gray.700">
+                  {isWeekView
+                    ? currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                    : currentDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </Text>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent width="340px">
+              <PopoverBody p={4}>
+                <VStack spacing={4} align="stretch">
+                  {/* Month and Year Dropdowns */}
+                  <Flex gap={2} align="center" mb={2}>
+                    <Select
+                      value={pickerMonth}
+                      onChange={e => setPickerMonth(Number(e.target.value))}
+                      size="sm"
+                      width="auto"
+                    >
+                      {months.map((month, idx) => (
+                        <option key={month} value={idx}>{month}</option>
+                      ))}
+                    </Select>
+                    <Select
+                      value={pickerYear}
+                      onChange={e => setPickerYear(Number(e.target.value))}
+                      size="sm"
+                      width="auto"
+                    >
+                      {years.map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </Select>
+                  </Flex>
+                  {/* Standard calendar grid for day selection */}
+                  <Box>
+                    <SimpleGrid columns={7} spacing={1}>
+                      {/* Day of week headers */}
+                      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                        <Text key={d} fontSize="xs" fontWeight="bold" textAlign="center">{d}</Text>
+                      ))}
+                      {/* Days of month */}
+                      {(() => {
+                        const firstDay = new Date(pickerYear, pickerMonth, 1);
+                        const lastDay = new Date(pickerYear, pickerMonth + 1, 0);
+                        const daysInMonth = lastDay.getDate();
+                        const startWeekDay = firstDay.getDay();
+                        const grid: React.ReactNode[] = [];
+                        // Empty cells before first day
+                        for (let i = 0; i < startWeekDay; i++) {
+                          grid.push(<Box key={"empty-" + i} />);
+                        }
+                        // Days
+                        for (let d = 1; d <= daysInMonth; d++) {
+                          const isSelected =
+                            pickerYear === currentDate.getFullYear() &&
+                            pickerMonth === currentDate.getMonth() &&
+                            d === currentDate.getDate();
+                          grid.push(
+                            <Button
+                              key={"day-" + d}
+                              size="sm"
+                              variant={isSelected ? "solid" : "ghost"}
+                              colorScheme={isSelected ? "purple" : undefined}
+                              onClick={() => {
+                                const newDate = new Date(pickerYear, pickerMonth, d);
+                                setCurrentDate(newDate);
+                                setIsDatePickerOpen(false);
+                              }}
+                            >
+                              {d}
+                            </Button>
+                          );
+                        }
+                        return grid;
+                      })()}
+                    </SimpleGrid>
+                  </Box>
+                </VStack>
+              </PopoverBody>
+            </PopoverContent>
+          </Popover>
+        </Flex>
+      </VStack>
+      {/* Day headers - only for week view */}
+      {isWeekView && (
+        <Flex mb={2}>
+          <Box width="80px" flexShrink={0} />
+          {days.map((day, index) => (
+            <Box
+              key={index}
+              flex={1}
+              textAlign="center"
+              py={2}
+              bg={day.isToday ? 'blue.50' : 'transparent'}
+              color={day.isToday ? 'blue.700' : 'gray.700'}
+              fontWeight={day.isToday ? 'bold' : 'normal'}
+              rounded="md"
+              mx={1}
+            >
+              <Text fontSize="xs" fontWeight="medium">{day.label}</Text>
+              <Text fontSize="lg" fontWeight="bold">{day.date.getDate()}</Text>
+            </Box>
+          ))}
+        </Flex>
+      )}
 
       {/* Calendar grid */}
       <Box
@@ -417,64 +533,74 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
             ))}
           </VStack>
           {/* Day columns */}
-          {days.map((day, dayIndex) => (
-            <Box
-              key={dayIndex}
-              flex={1}
-              borderLeft={dayIndex === 0 ? undefined : "1px solid"}
-              borderColor="gray.200"
-              position="relative"
-              height={contentHeight + 'px'}
-              bg="transparent"
-            >
-              {/* Meeting blocks for this day */}
-              {filteredMeetings.filter(meeting => isSameLocalDay(new Date(meeting.start_time), day.date)).map(meeting => {
-                const { top, height } = getMeetingPosition(meeting);
-                const meetingDate = new Date(meeting.start_time);
-                const meetingEndDate = new Date(meeting.end_time);
-                return (
-                  <Box
-                    key={meeting.id}
-                    position="absolute"
-                    left={"8px"}
-                    right={"8px"}
-                    top={top + 'px'}
-                    height={height + 'px'}
-                    bg={getMeetingColor(meeting.status)}
-                    rounded="md"
-                    p={2}
-                    boxShadow="sm"
-                    zIndex={5}
-                    minHeight={SLOT_HEIGHT + 'px'}
-                    cursor="pointer"
-                    _hover={{ opacity: 0.8, transform: 'scale(1.02)' }}
-                    transition="all 0.2s"
-                    onClick={() => onViewMeeting?.(meeting)}
-                  >
-                    <VStack spacing={1} align="start">
-                      <Text fontSize="xs" fontWeight="semibold" color="white">
-                        {meeting.title || 'Meeting'}
-                      </Text>
-                      <Text fontSize="xs" color="white" opacity={0.9}>
-                        {meetingDate.toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true
-                        })} – {meetingEndDate.toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true
-                        })}
-                      </Text>
-                      <Text fontSize="xs" color="white" opacity={0.8}>
-                        ${meeting.price_total.toFixed(2)}
-                      </Text>
-                    </VStack>
-                  </Box>
-                );
-              })}
-            </Box>
-          ))}
+          {days.map((day, dayIndex) => {
+            // Assign columns for this day's meetings
+            const dayMeetings = filteredMeetings.filter(meeting => isSameLocalDay(new Date(meeting.start_time), day.date));
+            const meetingColumns = assignMeetingColumns(dayMeetings);
+            return (
+              <Box
+                key={dayIndex}
+                flex={1}
+                borderLeft={dayIndex === 0 ? undefined : "1px solid"}
+                borderColor="gray.200"
+                position="relative"
+                height={contentHeight + 'px'}
+                bg="transparent"
+              >
+                {/* Meeting blocks for this day */}
+                {meetingColumns.map(({ meeting, col, columns }) => {
+                  const { top, height } = getMeetingPosition(meeting);
+                  const meetingDate = new Date(meeting.start_time);
+                  const meetingEndDate = new Date(meeting.end_time);
+                  // Side-by-side width and offset
+                  const widthPercent = 100 / columns;
+                  const leftPercent = col * widthPercent;
+                  return (
+                    <Box
+                      key={meeting.id}
+                      position="absolute"
+                      left={`calc(8px + ${leftPercent}%)`}
+                      width={`calc(${widthPercent}% - 16px/${columns})`}
+                      right={undefined}
+                      top={top + 'px'}
+                      height={height + 'px'}
+                      bg={getMeetingColor(meeting.status)}
+                      rounded="md"
+                      p={2}
+                      boxShadow="sm"
+                      zIndex={5}
+                      minHeight={SLOT_HEIGHT + 'px'}
+                      cursor="pointer"
+                      _hover={{ opacity: 0.8, transform: 'scale(1.02)' }}
+                      transition="all 0.2s"
+                      onClick={() => onViewMeeting?.(meeting)}
+                      overflow="hidden"
+                    >
+                      <VStack spacing={1} align="start">
+                        <Text fontSize="xs" fontWeight="semibold" color="white">
+                          {meeting.title || 'Meeting'}
+                        </Text>
+                        <Text fontSize="xs" color="white" opacity={0.9}>
+                          {meetingDate.toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })} – {meetingEndDate.toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </Text>
+                        <Text fontSize="xs" color="white" opacity={0.8}>
+                          ${meeting.price_total.toFixed(2)}
+                        </Text>
+                      </VStack>
+                    </Box>
+                  );
+                })}
+              </Box>
+            );
+          })}
         </Flex>
       </Box>
       {/* Show full day / show less button */}
