@@ -234,18 +234,16 @@ class ApiClient {
   }
 
   // Stats API
-  async getStatsOverview(period: string = 'last7days', serviceId?: string): Promise<StatsOverview> {
-    const params = new URLSearchParams({ period });
+  async getStatsOverview(
+    startDate?: string,
+    endDate?: string,
+    serviceId?: string
+  ): Promise<StatsOverview> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
     if (serviceId) params.append('service_id', serviceId);
     return this.request<StatsOverview>(`/stats/overview?${params}`);
-  }
-
-  async getDayStats(targetDate: string): Promise<StatsOverview> {
-    return this.request<StatsOverview>(`/stats/day_stats/${targetDate}`);
-  }
-
-  async getWeekStats(targetDate: string): Promise<StatsOverview> {
-    return this.request<StatsOverview>(`/stats/week_stats/${targetDate}`);
   }
 }
 

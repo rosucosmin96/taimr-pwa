@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Modal,
   ModalOverlay,
@@ -40,6 +40,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [pricePerHour, setPricePerHour] = useState('');
+  const [pricePerMeeting, setPricePerMeeting] = useState('');
   const [status, setStatus] = useState<'upcoming' | 'done' | 'canceled'>('upcoming');
   const [paid, setPaid] = useState(false);
 
@@ -48,6 +49,59 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
   const [clientDuration, setClientDuration] = useState<number | null>(null);
   const [servicePrice, setServicePrice] = useState<number | null>(null);
   const [clientPrice, setClientPrice] = useState<number | null>(null);
+
+  // Track which field user is editing to prevent auto-updates
+  const [isEditingPricePerHour, setIsEditingPricePerHour] = useState(false);
+  const [isEditingPricePerMeeting, setIsEditingPricePerMeeting] = useState(false);
+
+  // Calculate meeting duration in hours
+  const getMeetingDurationHours = useCallback(() => {
+    if (!startTime || !endTime) return 0;
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    return (end.getTime() - start.getTime()) / (1000 * 60 * 60); // Convert to hours
+  }, [startTime, endTime]);
+
+  // Calculate price per meeting from price per hour
+  const calculatePricePerMeeting = useCallback((hourlyRate: number) => {
+    const durationHours = getMeetingDurationHours();
+    return (hourlyRate * durationHours).toFixed(2);
+  }, [getMeetingDurationHours]);
+
+  // Calculate price per hour from price per meeting
+  const calculatePricePerHour = useCallback((meetingPrice: number) => {
+    const durationHours = getMeetingDurationHours();
+    return durationHours > 0 ? (meetingPrice / durationHours).toFixed(2) : '0';
+  }, [getMeetingDurationHours]);
+
+  // Handle price per hour change
+  const handlePricePerHourChange = (value: string) => {
+    setPricePerHour(value);
+    if (!isEditingPricePerMeeting) {
+      const hourlyRate = parseFloat(value) || 0;
+      const meetingPrice = calculatePricePerMeeting(hourlyRate);
+      setPricePerMeeting(meetingPrice);
+    }
+  };
+
+  // Handle price per meeting change
+  const handlePricePerMeetingChange = (value: string) => {
+    setPricePerMeeting(value);
+    if (!isEditingPricePerHour) {
+      const meetingPrice = parseFloat(value) || 0;
+      const hourlyRate = calculatePricePerHour(meetingPrice);
+      setPricePerHour(hourlyRate);
+    }
+  };
+
+  // Update prices when duration changes (only if not actively editing)
+  useEffect(() => {
+    if (pricePerHour && startTime && endTime && !isEditingPricePerHour && !isEditingPricePerMeeting) {
+      const hourlyRate = parseFloat(pricePerHour);
+      const meetingPrice = calculatePricePerMeeting(hourlyRate);
+      setPricePerMeeting(meetingPrice);
+    }
+  }, [startTime, endTime, pricePerHour, calculatePricePerMeeting, isEditingPricePerHour, isEditingPricePerMeeting]);
 
   // Fetch services on open
   useEffect(() => {
@@ -205,7 +259,27 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
                 </FormControl>
                 <FormControl isRequired>
                   <FormLabel>Price per Hour</FormLabel>
-                  <Input type="number" value={pricePerHour} onChange={e => setPricePerHour(e.target.value)} min={0} step={0.01} />
+                  <Input
+                    type="number"
+                    value={pricePerHour}
+                    onChange={e => handlePricePerHourChange(e.target.value)}
+                    onFocus={() => setIsEditingPricePerHour(true)}
+                    onBlur={() => setIsEditingPricePerHour(false)}
+                    min={0}
+                    step={0.01}
+                  />
+                </FormControl>
+                <FormControl isRequired>
+                  <FormLabel>Price per Meeting</FormLabel>
+                  <Input
+                    type="number"
+                    value={pricePerMeeting}
+                    onChange={e => handlePricePerMeetingChange(e.target.value)}
+                    onFocus={() => setIsEditingPricePerMeeting(true)}
+                    onBlur={() => setIsEditingPricePerMeeting(false)}
+                    min={0}
+                    step={0.01}
+                  />
                 </FormControl>
                 <FormControl isRequired>
                   <FormLabel>Status</FormLabel>

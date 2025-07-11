@@ -26,9 +26,20 @@ const Dashboard: React.FC = () => {
       try {
         setLoading(true);
         const today = new Date().toISOString().split('T')[0];
+
+        // Calculate week start and end dates
+        const todayDate = new Date();
+        const weekStart = new Date(todayDate);
+        weekStart.setDate(todayDate.getDate() - todayDate.getDay()); // Start of week (Sunday)
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6); // End of week (Saturday)
+
+        const weekStartStr = weekStart.toISOString().split('T')[0];
+        const weekEndStr = weekEnd.toISOString().split('T')[0];
+
         const [todayStatsData, weekStatsData, meetingsData, profileData] = await Promise.all([
-          apiClient.getDayStats(today),
-          apiClient.getWeekStats(today),
+          apiClient.getStatsOverview(today, today), // Today's stats
+          apiClient.getStatsOverview(weekStartStr, weekEndStr), // This week's stats
           apiClient.getMeetings(undefined, today),
           apiClient.getProfile()
         ]);

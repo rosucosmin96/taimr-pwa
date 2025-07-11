@@ -1,22 +1,291 @@
 import React, { useState, useEffect } from 'react';
 import StatsCard from '../components/StatsCard';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { CurrencyDollarIcon, UserGroupIcon, CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
-import { Box, Grid, Stack, Heading, Text, Spinner, Alert, AlertIcon, Select, Flex } from '@chakra-ui/react';
-import { apiClient, StatsOverview } from '../lib/api';
+import { CurrencyDollarIcon, UserGroupIcon, CalendarDaysIcon, ClockIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import {
+  Box,
+  Grid,
+  Stack,
+  Heading,
+  Text,
+  Spinner,
+  Alert,
+  AlertIcon,
+  Select,
+  Flex,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverBody,
+  Button,
+  HStack,
+  VStack,
+  useDisclosure,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  TableContainer,
+  Card,
+  CardBody,
+  SimpleGrid,
+  Divider,
+  Badge,
+  useBreakpointValue,
+  GridItem
+} from '@chakra-ui/react';
+import { apiClient, StatsOverview, Service } from '../lib/api';
+
+interface ServiceStats {
+  serviceId: string;
+  serviceName: string;
+  revenue: number;
+  hours: number;
+  meetings: number;
+}
+
+const SIDEBAR_WIDTH = 256;
+const SAFE_MARGIN = 32;
+const MIN_CELL_WIDTH = 220;
+
+const ResponsiveContentWrapper: React.FC<{ children: (maxWidth: number) => React.ReactNode }> = ({ children }) => {
+  const isSidebarActive = useBreakpointValue({ base: false, md: true });
+  const [maxWidth, setMaxWidth] = useState(
+    window.innerWidth - (isSidebarActive ? SIDEBAR_WIDTH : 0) - SAFE_MARGIN
+  );
+  useEffect(() => {
+    function handleResize() {
+      setMaxWidth(window.innerWidth - (isSidebarActive ? SIDEBAR_WIDTH : 0) - SAFE_MARGIN);
+    }
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isSidebarActive]);
+  return <div style={{ width: '100%', maxWidth, margin: '0 auto', transition: 'max-width 0.2s' }}>{children(maxWidth)}</div>;
+};
+
+const useKpiGridLayout = () => {
+  const isSidebarActive = useBreakpointValue({ base: false, md: true });
+  const [isThreeByTwo, setIsThreeByTwo] = useState(false);
+  useEffect(() => {
+    function handleResize() {
+      const sidebar = isSidebarActive ? SIDEBAR_WIDTH : 0;
+      const safe = SAFE_MARGIN;
+      const gridMinWidth = 3 * MIN_CELL_WIDTH;
+      setIsThreeByTwo(window.innerWidth < sidebar + gridMinWidth + safe);
+    }
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isSidebarActive]);
+  return isThreeByTwo;
+};
 
 const Stats: React.FC = () => {
   const [stats, setStats] = useState<StatsOverview | null>(null);
+  const [services, setServices] = useState<Service[]>([]);
+  const [serviceStats, setServiceStats] = useState<ServiceStats[]>([]);
+  const [previousStats, setPreviousStats] = useState<StatsOverview | null>(null);
+  const [clientStats, setClientStats] = useState<any[]>([]);
+  const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState('last7days');
+  const [selectedService, setSelectedService] = useState<string>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const { isOpen, onOpen, onClose } = useDisclosure();
+
+  // Responsive breakpoints
+  const isMobile = useBreakpointValue({ base: true, md: false });
+  const isTablet = useBreakpointValue({ base: false, md: true, lg: false });
+  const isDesktop = useBreakpointValue({ base: false, lg: true });
+
+  const isThreeByTwo = useKpiGridLayout();
+
+  // Fetch services on component mount
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const servicesData = await apiClient.getServices();
+        setServices(servicesData);
+
+        // If there's only one service, automatically select it
+        if (servicesData.length === 1) {
+          setSelectedService(servicesData[0].id);
+        }
+      } catch (err) {
+        console.error('Failed to fetch services:', err);
+      }
+    };
+    fetchServices();
+  }, []);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const data = await apiClient.getStatsOverview(period);
+        setError(null);
+
+        let startDateParam: string | undefined;
+        let endDateParam: string | undefined;
+        let serviceIdParam: string | undefined;
+
+        if (period === 'custom') {
+          if (!startDate || !endDate) {
+            // Don't show error, just don't fetch yet
+            setLoading(false);
+            return;
+          }
+          startDateParam = startDate;
+          endDateParam = endDate;
+        } else if (period !== 'allTime') {
+          // Calculate relative periods
+          const today = new Date();
+          const endDate = new Date(today);
+
+          switch (period) {
+            case 'last7days':
+              const sevenDaysAgo = new Date(today);
+              sevenDaysAgo.setDate(today.getDate() - 7);
+              startDateParam = sevenDaysAgo.toISOString().split('T')[0];
+              endDateParam = today.toISOString().split('T')[0];
+              break;
+            case 'last30days':
+              const thirtyDaysAgo = new Date(today);
+              thirtyDaysAgo.setDate(today.getDate() - 30);
+              startDateParam = thirtyDaysAgo.toISOString().split('T')[0];
+              endDateParam = today.toISOString().split('T')[0];
+              break;
+            case 'last90days':
+              const ninetyDaysAgo = new Date(today);
+              ninetyDaysAgo.setDate(today.getDate() - 90);
+              startDateParam = ninetyDaysAgo.toISOString().split('T')[0];
+              endDateParam = today.toISOString().split('T')[0];
+              break;
+            case 'thisMonth':
+              const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+              startDateParam = firstDayOfMonth.toISOString().split('T')[0];
+              endDateParam = today.toISOString().split('T')[0];
+              break;
+            case 'thisYear':
+              const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+              startDateParam = firstDayOfYear.toISOString().split('T')[0];
+              endDateParam = today.toISOString().split('T')[0];
+              break;
+          }
+        }
+
+        // Set service ID if not "all"
+        if (selectedService !== 'all') {
+          serviceIdParam = selectedService;
+        }
+
+        const data = await apiClient.getStatsOverview(startDateParam, endDateParam, serviceIdParam);
         setStats(data);
+
+        // Fetch previous period stats for comparison (except for allTime and custom)
+        if (period !== 'allTime' && period !== 'custom' && startDateParam && endDateParam) {
+          try {
+            const currentStart = new Date(startDateParam);
+            const currentEnd = new Date(endDateParam);
+            const periodDuration = currentEnd.getTime() - currentStart.getTime();
+
+            // Calculate previous period dates
+            const previousEnd = new Date(currentStart);
+            const previousStart = new Date(previousEnd.getTime() - periodDuration);
+
+            const previousStartStr = previousStart.toISOString().split('T')[0];
+            const previousEndStr = previousEnd.toISOString().split('T')[0];
+
+            const previousData = await apiClient.getStatsOverview(previousStartStr, previousEndStr, serviceIdParam);
+            setPreviousStats(previousData);
+          } catch (err) {
+            console.error('Failed to fetch previous period stats:', err);
+            setPreviousStats(null);
+          }
+        } else {
+          setPreviousStats(null);
+        }
+
+        // Fetch client statistics
+        if (startDateParam && endDateParam) {
+          try {
+            const clients = await apiClient.getClients(serviceIdParam);
+            const clientStatsPromises = clients.map(async (client) => {
+              try {
+                // For now, we'll use mock data since the API doesn't have client-specific stats
+                // In a real implementation, you'd have an endpoint like /stats/client/{client_id}
+                const mockClientStats = {
+                  clientId: client.id,
+                  clientName: client.name,
+                  totalMeetings: Math.floor(Math.random() * 10) + 1,
+                  canceledMeetings: Math.floor(Math.random() * 3),
+                  totalRevenue: Math.random() * 1000 + 100,
+                  pricePerHour: client.custom_price_per_hour || 50,
+                  hours: Math.random() * 20 + 2
+                };
+
+                return {
+                  ...mockClientStats,
+                  pricePerMeeting: mockClientStats.totalRevenue / mockClientStats.totalMeetings
+                };
+              } catch (err) {
+                console.error(`Failed to fetch stats for client ${client.name}:`, err);
+                return {
+                  clientId: client.id,
+                  clientName: client.name,
+                  totalMeetings: 0,
+                  canceledMeetings: 0,
+                  totalRevenue: 0,
+                  pricePerHour: client.custom_price_per_hour || 0,
+                  hours: 0,
+                  pricePerMeeting: 0
+                };
+              }
+            });
+
+            const clientStatsData = await Promise.all(clientStatsPromises);
+            setClientStats(clientStatsData);
+          } catch (err) {
+            console.error('Failed to fetch client stats:', err);
+            setClientStats([]);
+          }
+        } else {
+          setClientStats([]);
+        }
+
+        // If "All Services" is selected, fetch stats for each service
+        if (selectedService === 'all' && services.length > 0) {
+          const serviceStatsPromises = services.map(async (service) => {
+            try {
+              const serviceData = await apiClient.getStatsOverview(startDateParam, endDateParam, service.id);
+              return {
+                serviceId: service.id,
+                serviceName: service.name,
+                revenue: serviceData.total_revenue,
+                hours: serviceData.total_hours,
+                meetings: serviceData.total_meetings
+              };
+            } catch (err) {
+              console.error(`Failed to fetch stats for service ${service.name}:`, err);
+              return {
+                serviceId: service.id,
+                serviceName: service.name,
+                revenue: 0,
+                hours: 0,
+                meetings: 0
+              };
+            }
+          });
+
+          const serviceStatsData = await Promise.all(serviceStatsPromises);
+          setServiceStats(serviceStatsData);
+        } else {
+          setServiceStats([]);
+        }
       } catch (err) {
         setError('Failed to load statistics');
         console.error('Stats fetch error:', err);
@@ -26,14 +295,42 @@ const Stats: React.FC = () => {
     };
 
     fetchStats();
-  }, [period]);
+  }, [period, startDate, endDate, selectedService, services]);
+
+  const handleCustomPeriodSelect = () => {
+    if (startDate && endDate) {
+      onClose();
+    }
+  };
+
+  const formatDateRange = () => {
+    if (!startDate || !endDate) return 'Select dates';
+    return `${startDate} to ${endDate}`;
+  };
+
+  // Calculate percentage change
+  const calculatePercentageChange = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+  };
+
+  // Filter clients based on search term
+  const filteredClientStats = clientStats.filter(client =>
+    client.clientName.toLowerCase().includes(clientSearchTerm.toLowerCase())
+  );
+
+  // Check if we should show service selector (only if multiple services exist)
+  const shouldShowServiceSelector = services.length > 1;
+
+  // Check if we should show period comparison (not for allTime or custom)
+  const shouldShowPeriodComparison = period !== 'allTime' && period !== 'custom' && previousStats !== null;
 
   if (loading) {
     return (
-      <Stack spacing={8} px={{ base: 2, md: 8 }} py={4}>
-        <Heading as="h1" size="lg" mb={4}>Statistics</Heading>
-        <Flex justify="center" align="center" minH="200px">
-          <Spinner size="lg" color="purple.500" />
+      <Stack spacing={{ base: 4, md: 8 }} px={{ base: 3, md: 8 }} py={{ base: 2, md: 4 }}>
+        <Heading as="h1" size={{ base: "md", md: "lg" }} mb={4}>Statistics</Heading>
+        <Flex justify="center" align="center" minH={{ base: "150px", md: "200px" }}>
+          <Spinner size={{ base: "md", md: "lg" }} color="purple.500" />
         </Flex>
       </Stack>
     );
@@ -41,9 +338,9 @@ const Stats: React.FC = () => {
 
   if (error) {
     return (
-      <Stack spacing={8} px={{ base: 2, md: 8 }} py={4}>
-        <Heading as="h1" size="lg" mb={4}>Statistics</Heading>
-        <Alert status="error">
+      <Stack spacing={{ base: 4, md: 8 }} px={{ base: 3, md: 8 }} py={{ base: 2, md: 4 }}>
+        <Heading as="h1" size={{ base: "md", md: "lg" }} mb={4}>Statistics</Heading>
+        <Alert status="error" borderRadius="lg">
           <AlertIcon />
           {error}
         </Alert>
@@ -76,6 +373,18 @@ const Stats: React.FC = () => {
       icon: <ClockIcon style={{ width: 28, height: 28 }} color="#D69E2E" />,
       color: 'yellow.100'
     },
+    {
+      title: 'Average Price per Meeting',
+      value: `$${stats && stats.total_meetings > 0 ? (stats.total_revenue / stats.total_meetings).toFixed(2) : '0.00'}`,
+      icon: <CurrencyDollarIcon style={{ width: 28, height: 28 }} color="#38A169" />,
+      color: 'green.100'
+    },
+    {
+      title: 'Average Price per Hour',
+      value: `$${stats && stats.total_hours > 0 ? (stats.total_revenue / stats.total_hours).toFixed(2) : '0.00'}`,
+      icon: <ClockIcon style={{ width: 28, height: 28 }} color="#3182CE" />,
+      color: 'blue.100'
+    }
   ];
 
   // Meeting status data for pie chart
@@ -96,75 +405,479 @@ const Stats: React.FC = () => {
     { name: 'Sun', Revenue: 80, Meetings: 1 },
   ];
 
+  // Service comparison data for charts
+  const serviceRevenueData = serviceStats.map(service => ({
+    name: service.serviceName,
+    revenue: service.revenue,
+    hours: service.hours
+  }));
+
   return (
-    <Stack spacing={8} px={{ base: 2, md: 8 }} py={4}>
-      <Heading as="h1" size="lg" mb={4}>Statistics</Heading>
+    <ResponsiveContentWrapper>
+      {(maxWidth) => (
+        <Stack spacing={{ base: 4, md: 8 }} px={{ base: 1, sm: 2, md: 8 }} py={{ base: 2, md: 4 }} w="full" maxW={maxWidth} minW={0} overflowX="hidden">
+          <Heading as="h1" size={{ base: "md", md: "lg" }} mb={4} textAlign={{ base: "center", md: "left" }}>Statistics</Heading>
 
-      {/* Period Selector */}
-      <Box>
-        <Select
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-          maxW="200px"
-          bg="white"
-        >
-          <option value="last7days">Last 7 Days</option>
-          <option value="last30days">Last 30 Days</option>
-          <option value="last90days">Last 90 Days</option>
-          <option value="thisMonth">This Month</option>
-          <option value="thisYear">This Year</option>
-        </Select>
-      </Box>
+          {/* Period and Service Selectors */}
+          <Box w="full" maxW={maxWidth} minW={0}>
+            <Flex wrap="wrap" gap={3} direction={{ base: 'column', sm: 'row' }} align="start" w="full" minW={0}>
+              {/* Period Selector */}
+              <Select
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                maxW={220}
+                minW={120}
+                flexShrink={1}
+                bg="white"
+                size={{ base: "md", md: "sm" }}
+                borderRadius="lg"
+                border="1px solid"
+                borderColor="gray.200"
+                _focus={{ borderColor: "purple.500", boxShadow: "0 0 0 1px var(--chakra-colors-purple-500)" }}
+                fontSize={{ base: "sm", md: "md" }}
+              >
+                <option value="allTime">All Time</option>
+                <option value="last7days">Last 7 Days</option>
+                <option value="last30days">Last 30 Days</option>
+                <option value="last90days">Last 90 Days</option>
+                <option value="thisMonth">This Month</option>
+                <option value="thisYear">This Year</option>
+                <option value="custom">Custom Period</option>
+              </Select>
 
-      {/* KPI Cards */}
-      <Grid templateColumns={{ base: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }} gap={4}>
-        {kpis.map((kpi) => (
-          <StatsCard key={kpi.title} {...kpi} />
-        ))}
-      </Grid>
-
-      {/* Charts */}
-      <Grid templateColumns={{ base: '1fr', lg: 'repeat(2, 1fr)' }} gap={6}>
-        {/* Weekly Revenue Chart */}
-        <Box bg="white" rounded="xl" shadow="md" p={6}>
-          <Text fontWeight="semibold" fontSize="lg" mb={4}>Weekly Revenue</Text>
-          <Box h="64" w="full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyData}>
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="Revenue" fill="#38A169" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </Box>
-        </Box>
-
-        {/* Meeting Status Distribution */}
-        <Box bg="white" rounded="xl" shadow="md" p={6}>
-          <Text fontWeight="semibold" fontSize="lg" mb={4}>Meeting Status</Text>
-          <Box h="64" w="full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={meetingStatusData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}`}
+              {/* Service Selector - Only show if multiple services exist */}
+              {shouldShowServiceSelector && (
+                <Select
+                  value={selectedService}
+                  onChange={(e) => setSelectedService(e.target.value)}
+                  maxW={220}
+                  minW={120}
+                  flexShrink={1}
+                  bg="white"
+                  size={{ base: "md", md: "sm" }}
+                  borderRadius="lg"
+                  border="1px solid"
+                  borderColor="gray.200"
+                  _focus={{ borderColor: "purple.500", boxShadow: "0 0 0 1px var(--chakra-colors-purple-500)" }}
+                  fontSize={{ base: "sm", md: "md" }}
                 >
-                  {meetingStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  <option value="all">All Services</option>
+                  {services.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name}
+                    </option>
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+                </Select>
+              )}
+            </Flex>
+
+            {/* Custom Date Range Popover */}
+            {period === 'custom' && (
+              <Box mt={3} w="full" maxW={maxWidth} minW={0}>
+                <Popover isOpen={isOpen} onOpen={onOpen} onClose={onClose} placement="bottom-start">
+                  <PopoverTrigger>
+                    <Button
+                      variant="outline"
+                      bg="white"
+                      w="full"
+                      maxW={maxWidth}
+                      justifyContent="space-between"
+                      size={{ base: "md", md: "sm" }}
+                      borderRadius="lg"
+                      border="1px solid"
+                      borderColor="gray.200"
+                      _hover={{ bg: 'gray.50' }}
+                      rightIcon={<ChevronDownIcon style={{ width: 16, height: 16 }} />}
+                      fontSize={{ base: "sm", md: "md" }}
+                    >
+                      {formatDateRange()}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent p={4} w={{ base: "calc(100vw - 32px)", md: "400px" }} maxW="400px">
+                    <PopoverBody>
+                      <VStack spacing={4}>
+                        <Text fontWeight="semibold" fontSize="sm">Select Date Range</Text>
+                        <VStack spacing={4} w="full">
+                          <VStack align="start" w="full">
+                            <Text fontSize="sm" fontWeight="medium">Start Date</Text>
+                            <input
+                              type="date"
+                              value={startDate}
+                              onChange={(e) => setStartDate(e.target.value)}
+                              style={{
+                                padding: '12px 16px',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '8px',
+                                fontSize: '16px',
+                                width: '100%',
+                                outline: 'none'
+                              }}
+                            />
+                          </VStack>
+                          <VStack align="start" w="full">
+                            <Text fontSize="sm" fontWeight="medium">End Date</Text>
+                            <input
+                              type="date"
+                              value={endDate}
+                              onChange={(e) => setEndDate(e.target.value)}
+                              style={{
+                                padding: '12px 16px',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '8px',
+                                fontSize: '16px',
+                                width: '100%',
+                                outline: 'none'
+                              }}
+                            />
+                          </VStack>
+                        </VStack>
+                        <HStack spacing={3} w="full" justify="flex-end">
+                          <Button size="sm" variant="ghost" onClick={onClose}>
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            colorScheme="purple"
+                            onClick={handleCustomPeriodSelect}
+                            isDisabled={!startDate || !endDate}
+                          >
+                            Apply
+                          </Button>
+                        </HStack>
+                      </VStack>
+                    </PopoverBody>
+                  </PopoverContent>
+                </Popover>
+              </Box>
+            )}
           </Box>
-        </Box>
-      </Grid>
-    </Stack>
+
+          {/* KPI Cards */}
+          <Grid
+            templateColumns={isThreeByTwo ? '1fr 1fr' : '1fr 1fr 1fr'}
+            templateRows={isThreeByTwo ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)'}
+            gap={4}
+            w="full"
+          >
+            {kpis.map((kpi) => (
+              <GridItem w="100%" h="100%" key={kpi.title}>
+                <StatsCard {...kpi} />
+              </GridItem>
+            ))}
+          </Grid>
+
+          {/* Service Comparison Section - Only show when "All Services" is selected */}
+          {selectedService === 'all' && serviceStats.length > 0 && (
+            <Box w="full" maxW={maxWidth} minW={0}>
+              <Heading as="h2" size={{ base: "sm", md: "md" }} mb={4} textAlign={{ base: "center", md: "left" }}>Service Comparison</Heading>
+
+              {/* Service Comparison Charts */}
+              <VStack spacing={{ base: 3, md: 4 }} mb={6} w="full">
+                {/* Revenue by Service */}
+                <Box bg="white" rounded="xl" shadow="md" p={{ base: 3, md: 6 }} w="full" maxW="100%">
+                  <Text fontWeight="semibold" fontSize={{ base: "sm", md: "lg" }} mb={3}>Revenue by Service</Text>
+                  <Box h={{ base: "40", md: "64" }} w="full" maxW="100%">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={serviceRevenueData}>
+                        <XAxis dataKey="name" fontSize={isMobile ? 8 : 12} />
+                        <YAxis fontSize={isMobile ? 8 : 12} />
+                        <Tooltip formatter={(value) => [`$${value}`, 'Revenue']} />
+                        <Bar dataKey="revenue" fill="#38A169" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Box>
+
+                {/* Hours by Service */}
+                <Box bg="white" rounded="xl" shadow="md" p={{ base: 3, md: 6 }} w="full" maxW="100%">
+                  <Text fontWeight="semibold" fontSize={{ base: "sm", md: "lg" }} mb={3}>Hours by Service</Text>
+                  <Box h={{ base: "40", md: "64" }} w="full" maxW="100%">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={serviceRevenueData}>
+                        <XAxis dataKey="name" fontSize={isMobile ? 8 : 12} />
+                        <YAxis fontSize={isMobile ? 8 : 12} />
+                        <Tooltip formatter={(value) => [`${value}h`, 'Hours']} />
+                        <Bar dataKey="hours" fill="#3182CE" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Box>
+              </VStack>
+
+              {/* Service Comparison Cards for Mobile, Table for Desktop */}
+              {isMobile ? (
+                <VStack spacing={{ base: 2, md: 3 }} align="stretch" w="full">
+                  {serviceStats.map((service) => (
+                    <Card key={service.serviceId} shadow="sm" border="1px solid" borderColor="gray.100" w="full" maxW="100%">
+                      <CardBody p={{ base: 3, md: 4 }}>
+                        <VStack spacing={{ base: 2, md: 3 }} align="stretch">
+                          <Text fontWeight="semibold" fontSize={{ base: "sm", md: "md" }}>{service.serviceName}</Text>
+                          <SimpleGrid columns={2} spacing={{ base: 2, md: 3 }}>
+                            <Box>
+                              <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Revenue</Text>
+                              <Text fontWeight="bold" color="green.600" fontSize={{ base: "sm", md: "md" }}>${service.revenue.toFixed(2)}</Text>
+                            </Box>
+                            <Box>
+                              <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Hours</Text>
+                              <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{service.hours.toFixed(1)}h</Text>
+                            </Box>
+                            <Box>
+                              <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Meetings</Text>
+                              <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{service.meetings}</Text>
+                            </Box>
+                            <Box>
+                              <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Avg. Revenue/Hour</Text>
+                              <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>
+                                ${service.hours > 0 ? (service.revenue / service.hours).toFixed(2) : '0.00'}
+                              </Text>
+                            </Box>
+                          </SimpleGrid>
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </VStack>
+              ) : (
+                <Box bg="white" rounded="xl" shadow="md" p={{ base: 4, md: 6 }} w="full" maxW="100%">
+                  <Text fontWeight="semibold" fontSize={{ base: "md", md: "lg" }} mb={4}>Service Breakdown</Text>
+                  <TableContainer maxW="100%">
+                    <Table variant="simple" size={{ base: "sm", md: "md" }}>
+                      <Thead>
+                        <Tr>
+                          <Th fontSize={{ base: "xs", md: "sm" }}>Service</Th>
+                          <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Revenue</Th>
+                          <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Hours</Th>
+                          <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Meetings</Th>
+                          <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Avg. Revenue/Hour</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {serviceStats.map((service) => (
+                          <Tr key={service.serviceId}>
+                            <Td fontWeight="medium" fontSize={{ base: "xs", md: "sm" }}>{service.serviceName}</Td>
+                            <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${service.revenue.toFixed(2)}</Td>
+                            <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{service.hours.toFixed(1)}h</Td>
+                            <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{service.meetings}</Td>
+                            <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>
+                              ${service.hours > 0 ? (service.revenue / service.hours).toFixed(2) : '0.00'}
+                            </Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
+            </Box>
+          )}
+
+          {/* Charts */}
+          <VStack spacing={{ base: 3, md: 4 }} w="full" maxW={maxWidth} minW={0}>
+            {/* Weekly Revenue Chart */}
+            <Box bg="white" rounded="xl" shadow="md" p={{ base: 3, md: 6 }} w="full" maxW="100%">
+              <Text fontWeight="semibold" fontSize={{ base: "sm", md: "lg" }} mb={3}>Weekly Revenue</Text>
+              <Box h={{ base: "40", md: "64" }} w="full" maxW="100%">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={weeklyData}>
+                    <XAxis dataKey="name" fontSize={isMobile ? 8 : 12} />
+                    <YAxis fontSize={isMobile ? 8 : 12} />
+                    <Tooltip />
+                    <Bar dataKey="Revenue" fill="#38A169" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            </Box>
+
+            {/* Meeting Status Distribution */}
+            <Box bg="white" rounded="xl" shadow="md" p={{ base: 3, md: 6 }} w="full" maxW="100%">
+              <Text fontWeight="semibold" fontSize={{ base: "sm", md: "lg" }} mb={3}>Meeting Status</Text>
+              <Box h={{ base: "40", md: "64" }} w="full" maxW="100%">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={meetingStatusData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={isMobile ? 50 : 80}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
+                    >
+                      {meetingStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+            </Box>
+          </VStack>
+
+          {/* Period Comparison Panel - Histogram */}
+          {shouldShowPeriodComparison && (
+            <Box bg="white" rounded="xl" shadow="md" p={{ base: 3, md: 6 }} w="full" maxW={maxWidth} minW={0}>
+              <Text fontWeight="semibold" fontSize={{ base: "sm", md: "lg" }} mb={3}>Period Comparison</Text>
+              <Box h={{ base: "40", md: "64" }} w="full" maxW="100%">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[
+                    {
+                      name: 'Previous Period',
+                      revenue: previousStats?.total_revenue || 0,
+                      fill: '#E2E8F0'
+                    },
+                    {
+                      name: 'Current Period',
+                      revenue: stats?.total_revenue || 0,
+                      fill: '#38A169'
+                    }
+                  ]}>
+                    <XAxis dataKey="name" fontSize={isMobile ? 8 : 12} />
+                    <YAxis fontSize={isMobile ? 8 : 12} />
+                    <Tooltip formatter={(value) => [`$${value}`, 'Revenue']} />
+                    <Bar dataKey="revenue" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+              <VStack spacing={{ base: 3, md: 4 }} mt={4} w="full">
+                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{ base: 3, md: 4 }} w="full">
+                  <Box textAlign="center">
+                    <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Previous Period</Text>
+                    <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="gray.700">
+                      ${previousStats?.total_revenue.toFixed(2) || '0.00'}
+                    </Text>
+                  </Box>
+                  <Box textAlign="center">
+                    <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Current Period</Text>
+                    <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="green.600">
+                      ${stats?.total_revenue.toFixed(2) || '0.00'}
+                    </Text>
+                  </Box>
+                  <Box textAlign="center">
+                    <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Change</Text>
+                    <Text
+                      fontSize={{ base: "sm", md: "lg" }}
+                      fontWeight="bold"
+                      color={calculatePercentageChange(stats?.total_revenue || 0, previousStats?.total_revenue || 0) >= 0 ? 'green.600' : 'red.600'}
+                    >
+                      {calculatePercentageChange(stats?.total_revenue || 0, previousStats?.total_revenue || 0) >= 0 ? '+' : ''}
+                      {calculatePercentageChange(stats?.total_revenue || 0, previousStats?.total_revenue || 0).toFixed(1)}%
+                    </Text>
+                  </Box>
+                </SimpleGrid>
+              </VStack>
+            </Box>
+          )}
+
+          {/* Client Statistics Table */}
+          {clientStats.length > 0 && (
+            <Box w="full" maxW={maxWidth} minW={0}>
+              <Heading as="h2" size={{ base: "sm", md: "md" }} mb={4} textAlign={{ base: "center", md: "left" }}>Client Statistics</Heading>
+              <Box bg="white" rounded="xl" shadow="md" p={{ base: 3, md: 6 }} w="full" maxW="100%">
+                {/* Search Bar */}
+                <Box mb={4} w="full" maxW="100%">
+                  <input
+                    type="text"
+                    placeholder="Search clients by name..."
+                    value={clientSearchTerm}
+                    onChange={(e) => setClientSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      outline: 'none',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#805AD5'}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                  />
+                </Box>
+
+                {/* Mobile Cards vs Desktop Table */}
+                {isMobile ? (
+                  <VStack spacing={{ base: 2, md: 3 }} align="stretch" w="full">
+                    {filteredClientStats.map((client) => (
+                      <Card key={client.clientId} shadow="sm" border="1px solid" borderColor="gray.100" w="full" maxW="100%">
+                        <CardBody p={{ base: 3, md: 4 }}>
+                          <VStack spacing={{ base: 2, md: 3 }} align="stretch">
+                            <Text fontWeight="semibold" fontSize={{ base: "sm", md: "md" }} color="purple.600">{client.clientName}</Text>
+                            <SimpleGrid columns={2} spacing={{ base: 2, md: 3 }}>
+                              <Box>
+                                <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Meetings</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{client.totalMeetings}</Text>
+                              </Box>
+                              <Box>
+                                <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Canceled</Text>
+                                <Text fontWeight="bold" color="red.500" fontSize={{ base: "sm", md: "md" }}>{client.canceledMeetings}</Text>
+                              </Box>
+                              <Box>
+                                <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Revenue</Text>
+                                <Text fontWeight="bold" color="green.600" fontSize={{ base: "sm", md: "md" }}>${client.totalRevenue.toFixed(2)}</Text>
+                              </Box>
+                              <Box>
+                                <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Price/Hour</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${client.pricePerHour.toFixed(2)}</Text>
+                              </Box>
+                              <Box>
+                                <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Hours</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{client.hours.toFixed(1)}h</Text>
+                              </Box>
+                              <Box>
+                                <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Price/Meeting</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${client.pricePerMeeting.toFixed(2)}</Text>
+                              </Box>
+                            </SimpleGrid>
+                          </VStack>
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </VStack>
+                ) : (
+                  <Box overflowX="auto" w="full" maxW="100%">
+                    <TableContainer maxW="100%">
+                      <Table variant="simple" size={{ base: "sm", md: "md" }}>
+                        <Thead>
+                          <Tr>
+                            <Th fontSize={{ base: "xs", md: "sm" }}>Client</Th>
+                            <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Total Meetings</Th>
+                            <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Canceled Meetings</Th>
+                            <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Total Revenue</Th>
+                            <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Price Per Hour</Th>
+                            <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Total Hours</Th>
+                            <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Price Per Meeting</Th>
+                          </Tr>
+                        </Thead>
+                        <Tbody>
+                          {filteredClientStats.map((client) => (
+                            <Tr key={client.clientId}>
+                              <Td fontWeight="medium" fontSize={{ base: "xs", md: "sm" }}>{client.clientName}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.totalMeetings}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.canceledMeetings}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${client.totalRevenue.toFixed(2)}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${client.pricePerHour.toFixed(2)}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.hours.toFixed(1)}h</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${client.pricePerMeeting.toFixed(2)}</Td>
+                            </Tr>
+                          ))}
+                        </Tbody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
+                {/* No results message */}
+                {filteredClientStats.length === 0 && clientSearchTerm && (
+                  <Box textAlign="center" py={8}>
+                    <Text color="gray.500" fontSize={{ base: "sm", md: "md" }}>No clients found matching "{clientSearchTerm}"</Text>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          )}
+        </Stack>
+      )}
+    </ResponsiveContentWrapper>
   );
 };
 

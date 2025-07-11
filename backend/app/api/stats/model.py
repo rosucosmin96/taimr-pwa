@@ -1,16 +1,7 @@
 from datetime import datetime
-from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel
-
-
-class PeriodType(str, Enum):
-    LAST_7_DAYS = "last7days"
-    LAST_30_DAYS = "last30days"
-    LAST_90_DAYS = "last90days"
-    THIS_MONTH = "thisMonth"
-    THIS_YEAR = "thisYear"
 
 
 class StatsOverview(BaseModel):

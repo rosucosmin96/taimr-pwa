@@ -61,7 +61,36 @@ function Sidebar({ open, onClose, user }: { open: boolean; onClose: () => void; 
         onClick={onClose}
       >
         <Box boxSize={8} mr={3}>
-          <img src={user?.profile_picture_url || 'https://randomuser.me/api/portraits/men/32.jpg'} alt={user?.name || 'User'} style={{ borderRadius: '9999px', width: '100%', height: '100%' }} />
+          {user?.profile_picture_url ? (
+            <img
+              src={user.profile_picture_url}
+              alt={user?.name || 'User'}
+              style={{ borderRadius: '9999px', width: '100%', height: '100%' }}
+            />
+          ) : (
+            <div
+              style={{
+                background: 'purple',
+                color: 'white',
+                borderRadius: '9999px',
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 'bold',
+                fontSize: '1.2em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {user?.name
+                ? user.name
+                    .split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                : ''}
+            </div>
+          )}
         </Box>
         <Text fontWeight="medium">{user?.name || 'User'}</Text>
       </Flex>
