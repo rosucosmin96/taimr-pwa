@@ -10,6 +10,14 @@ class MeetingStatus(str, Enum):
     DONE = "done"
     CANCELED = "canceled"
 
+    @classmethod
+    def from_str(cls, status_str: str) -> "MeetingStatus":
+        """Get MeetingStatus from a string (case-insensitive). Raises ValueError if not found."""
+        for status in cls:
+            if status.value.lower() == status_str.lower():
+                return status
+        raise ValueError(f"Invalid MeetingStatus: {status_str}")
+
 
 class MeetingBase(BaseModel):
     service_id: UUID

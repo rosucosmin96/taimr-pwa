@@ -36,7 +36,7 @@ import {
   useBreakpointValue,
   GridItem
 } from '@chakra-ui/react';
-import { apiClient, StatsOverview, Service } from '../lib/api';
+import { apiClient, StatsOverview, Service, DailyBreakdownItem } from '../lib/api';
 
 interface ServiceStats {
   serviceId: string;
@@ -96,6 +96,7 @@ const Stats: React.FC = () => {
   const [selectedService, setSelectedService] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [dailyBreakdown, setDailyBreakdown] = useState<DailyBreakdownItem[]>([]);
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   // Responsive breakpoints
@@ -133,49 +134,53 @@ const Stats: React.FC = () => {
         let endDateParam: string | undefined;
         let serviceIdParam: string | undefined;
 
+        // Helper to strip milliseconds from ISO string
+        const toIsoNoMillis = (date: Date) => date.toISOString().replace(/\.\d{3}Z$/, 'Z');
         if (period === 'custom') {
           if (!startDate || !endDate) {
-            // Don't show error, just don't fetch yet
             setLoading(false);
             return;
           }
-          startDateParam = startDate;
-          endDateParam = endDate;
+          // Convert custom local dates to UTC boundaries
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          const startOfDayLocal = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
+          const endOfDayLocal = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
+          startDateParam = toIsoNoMillis(startOfDayLocal);
+          endDateParam = toIsoNoMillis(endOfDayLocal);
         } else if (period !== 'allTime') {
           // Calculate relative periods
           const today = new Date();
-          const endDate = new Date(today);
-
+          const endDateLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+          let startDateLocal;
           switch (period) {
             case 'last7days':
-              const sevenDaysAgo = new Date(today);
-              sevenDaysAgo.setDate(today.getDate() - 7);
-              startDateParam = sevenDaysAgo.toISOString().split('T')[0];
-              endDateParam = today.toISOString().split('T')[0];
+              startDateLocal = new Date(today);
+              startDateLocal.setDate(today.getDate() - 7);
+              startDateLocal.setHours(0, 0, 0, 0);
               break;
             case 'last30days':
-              const thirtyDaysAgo = new Date(today);
-              thirtyDaysAgo.setDate(today.getDate() - 30);
-              startDateParam = thirtyDaysAgo.toISOString().split('T')[0];
-              endDateParam = today.toISOString().split('T')[0];
+              startDateLocal = new Date(today);
+              startDateLocal.setDate(today.getDate() - 30);
+              startDateLocal.setHours(0, 0, 0, 0);
               break;
             case 'last90days':
-              const ninetyDaysAgo = new Date(today);
-              ninetyDaysAgo.setDate(today.getDate() - 90);
-              startDateParam = ninetyDaysAgo.toISOString().split('T')[0];
-              endDateParam = today.toISOString().split('T')[0];
+              startDateLocal = new Date(today);
+              startDateLocal.setDate(today.getDate() - 90);
+              startDateLocal.setHours(0, 0, 0, 0);
               break;
             case 'thisMonth':
-              const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-              startDateParam = firstDayOfMonth.toISOString().split('T')[0];
-              endDateParam = today.toISOString().split('T')[0];
+              startDateLocal = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0, 0);
               break;
             case 'thisYear':
-              const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
-              startDateParam = firstDayOfYear.toISOString().split('T')[0];
-              endDateParam = today.toISOString().split('T')[0];
+              startDateLocal = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
               break;
+            default:
+              startDateLocal = new Date(today);
+              startDateLocal.setHours(0, 0, 0, 0);
           }
+          startDateParam = toIsoNoMillis(startDateLocal);
+          endDateParam = toIsoNoMillis(endDateLocal);
         }
 
         // Set service ID if not "all"
@@ -286,6 +291,18 @@ const Stats: React.FC = () => {
         } else {
           setServiceStats([]);
         }
+
+        // Fetch daily breakdown for the period
+        if (startDateParam && endDateParam) {
+          try {
+            const breakdown = await apiClient.getDailyBreakdown(startDateParam, endDateParam, serviceIdParam);
+            setDailyBreakdown(breakdown);
+          } catch (err) {
+            setDailyBreakdown([]);
+          }
+        } else {
+          setDailyBreakdown([]);
+        }
       } catch (err) {
         setError('Failed to load statistics');
         console.error('Stats fetch error:', err);
@@ -394,16 +411,16 @@ const Stats: React.FC = () => {
     { name: 'Upcoming', value: (stats?.total_meetings || 0) - (stats?.done_meetings || 0) - (stats?.canceled_meetings || 0), color: '#3182CE' },
   ];
 
-  // Weekly revenue data (mock data for now)
-  const weeklyData = [
-    { name: 'Mon', Revenue: 150, Meetings: 3 },
-    { name: 'Tue', Revenue: 200, Meetings: 4 },
-    { name: 'Wed', Revenue: 180, Meetings: 3 },
-    { name: 'Thu', Revenue: 220, Meetings: 4 },
-    { name: 'Fri', Revenue: 160, Meetings: 3 },
-    { name: 'Sat', Revenue: 120, Meetings: 2 },
-    { name: 'Sun', Revenue: 80, Meetings: 1 },
-  ];
+  // Weekly revenue data (from API)
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weeklyData = dailyBreakdown.map(item => {
+    const dateObj = new Date(item.date + 'T00:00:00Z');
+    return {
+      name: dayNames[dateObj.getUTCDay()],
+      Revenue: item.revenue,
+      Meetings: item.meetings_count,
+    };
+  });
 
   // Service comparison data for charts
   const serviceRevenueData = serviceStats.map(service => ({

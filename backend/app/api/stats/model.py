@@ -27,3 +27,10 @@ class ClientStats(BaseModel):
 class ClientStatsResponse(BaseModel):
     client_stats: ClientStats
     meetings: list[dict]  # Will contain meeting details
+
+
+class DailyBreakdownItem(BaseModel):
+    date: str  # YYYY-MM-DD (UTC)
+    revenue: float
+    meetings_count: int
+    meeting_ids: list[str]

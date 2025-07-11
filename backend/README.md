@@ -624,6 +624,13 @@ Copy `env.example` to `.env` and configure:
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 
+# Environment Configuration
+ENVIRONMENT=dev  # Set to "prod" for production
+
+# Test Data Configuration
+CREATE_TEST_DATA=false  # Set to "true" for development with test data
+# WARNING: Never set CREATE_TEST_DATA=true in production
+
 # Database Configuration
 LOCAL_ENVIRONMENT=false
 
@@ -644,6 +651,34 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 # CORS Configuration
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 ```
+
+### Test Data Setup
+
+For development, you can automatically create test data on startup:
+
+1. **Enable test data creation:**
+   ```bash
+   # In your .env file
+   CREATE_TEST_DATA=true
+   ENVIRONMENT=dev
+   ```
+
+2. **Start the server:**
+   ```bash
+   make dev
+   ```
+
+The server will automatically create:
+- 1 test user (ID: `00000000-0000-0000-0000-000000000000`)
+- 3 test services (Web Development, Graphic Design, Consulting)
+- 3 test clients with different pricing configurations
+- 3 test meetings (past, today, and future)
+
+**Important Notes:**
+- Test data is only created in development environment (`ENVIRONMENT=dev`)
+- Test data creation is idempotent - safe to run multiple times
+- Test data is never created in production, even if `CREATE_TEST_DATA=true`
+- You can also manually create test data using: `python init_test_data.py`
 
 ## 📝 Notes
 

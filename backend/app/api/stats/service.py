@@ -1,91 +1,201 @@
-from datetime import date, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from sqlalchemy import and_
+from sqlalchemy.orm import Session
+
 from app.api.stats.model import (
-    ClientStats,
     ClientStatsResponse,
+    DailyBreakdownItem,  # <-- add import
     StatsOverview,
 )
+from app.models import Client as ClientModel
+from app.models import Meeting as MeetingModel
+from app.models.meeting import MeetingStatus
 
 
 class StatsService:
-    def __init__(self):
-        # Mock data
-        self.mock_overview = StatsOverview(
-            total_meetings=15,
-            done_meetings=12,
-            canceled_meetings=2,
-            total_clients=5,
-            total_revenue=1250.0,
-            total_hours=18.5,
-        )
-
-        self.mock_client_stats = ClientStats(
-            client_id=UUID("44444444-4444-4444-4444-444444444444"),
-            client_name="John Smith",
-            total_meetings=6,
-            done_meetings=5,
-            canceled_meetings=1,
-            total_revenue=480.0,
-            total_hours=8.0,
-            last_meeting=datetime(2024, 3, 10, 16, 0, 0),
-        )
-
-        self.mock_meetings = [
-            {
-                "id": "77777777-7777-7777-7777-777777777777",
-                "start_time": "2024-03-15T14:00:00",
-                "end_time": "2024-03-15T16:00:00",
-                "status": "upcoming",
-                "price_total": 160.0,
-                "paid": False,
-            },
-            {
-                "id": "88888888-8888-8888-8888-888888888888",
-                "start_time": "2024-03-10T10:00:00",
-                "end_time": "2024-03-10T11:30:00",
-                "status": "done",
-                "price_total": 90.0,
-                "paid": True,
-            },
-        ]
+    def __init__(self, db: Session):
+        self.db = db
 
     async def get_overview(
         self,
         user_id: UUID,
-        start_date: date | None = None,
-        end_date: date | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
         service_id: UUID | None = None,
     ) -> StatsOverview:
-        """Get overview statistics for a user.
-        If no dates provided, returns all-time stats.
-        If dates provided, returns stats for the specified period."""
+        """Get overview statistics for a user"""
+        query = self.db.query(MeetingModel).filter(MeetingModel.user_id == str(user_id))
 
-        # For now, return mock data
-        # In a real implementation, you would:
-        # 1. Query the database based on the date range
-        # 2. Filter by service_id if provided
-        # 3. Calculate statistics from the actual data
+        # Apply datetime filters (UTC)
+        if start_date:
+            query = query.filter(MeetingModel.start_time >= start_date)
+        if end_date:
+            query = query.filter(MeetingModel.start_time <= end_date)
 
-        if start_date and end_date:
-            # Custom period - return filtered data
-            # This is where you'd implement date filtering logic
-            return StatsOverview(
-                total_meetings=8,
-                done_meetings=6,
-                canceled_meetings=1,
-                total_clients=3,
-                total_revenue=480.0,
-                total_hours=9.0,
-            )
-        else:
-            # All-time stats (default)
-            return self.mock_overview
+        # Apply service filter
+        if service_id:
+            query = query.filter(MeetingModel.service_id == str(service_id))
+
+        meetings = query.all()
+
+        # Calculate statistics
+        total_meetings = len(meetings)
+        done_meetings = len(
+            [m for m in meetings if m.status == MeetingStatus.DONE.value]
+        )
+        canceled_meetings = len(
+            [m for m in meetings if m.status == MeetingStatus.CANCELED.value]
+        )
+
+        # Get unique clients
+        client_ids = list({m.client_id for m in meetings})
+        total_clients = len(client_ids)
+
+        # Calculate revenue and hours
+        total_revenue = sum(
+            m.price_total for m in meetings if m.status == MeetingStatus.DONE.value
+        )
+        total_hours = sum(
+            (m.end_time - m.start_time).total_seconds() / 3600
+            for m in meetings
+            if m.status == MeetingStatus.DONE.value
+        )
+
+        return StatsOverview(
+            total_meetings=total_meetings,
+            done_meetings=done_meetings,
+            canceled_meetings=canceled_meetings,
+            total_clients=total_clients,
+            total_revenue=total_revenue,
+            total_hours=total_hours,
+        )
 
     async def get_client_stats(
-        self, user_id: UUID, client_id: UUID
-    ) -> ClientStatsResponse:
-        """Get detailed statistics for a specific client"""
-        return ClientStatsResponse(
-            client_stats=self.mock_client_stats, meetings=self.mock_meetings
+        self,
+        user_id: UUID,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        service_id: UUID | None = None,
+    ) -> list[ClientStatsResponse]:
+        """Get client statistics for a user"""
+        # Get all clients for the user
+        clients_query = self.db.query(ClientModel).filter(
+            ClientModel.user_id == str(user_id)
         )
+        if service_id:
+            clients_query = clients_query.filter(
+                ClientModel.service_id == str(service_id)
+            )
+
+        clients = clients_query.all()
+        client_stats = []
+
+        for client in clients:
+            # Get meetings for this client
+            meetings_query = self.db.query(MeetingModel).filter(
+                and_(
+                    MeetingModel.user_id == str(user_id),
+                    MeetingModel.client_id == client.id,
+                )
+            )
+
+            # Apply datetime filters (UTC)
+            if start_date:
+                meetings_query = meetings_query.filter(
+                    MeetingModel.start_time >= start_date
+                )
+            if end_date:
+                meetings_query = meetings_query.filter(
+                    MeetingModel.start_time <= end_date
+                )
+
+            meetings = meetings_query.all()
+
+            if not meetings:
+                continue
+
+            # Calculate client statistics
+            total_meetings = len(meetings)
+            done_meetings = len(
+                [m for m in meetings if m.status == MeetingStatus.DONE.value]
+            )
+            canceled_meetings = len(
+                [m for m in meetings if m.status == MeetingStatus.CANCELED.value]
+            )
+
+            total_revenue = sum(
+                m.price_total for m in meetings if m.status == MeetingStatus.DONE.value
+            )
+            total_hours = sum(
+                (m.end_time - m.start_time).total_seconds() / 3600
+                for m in meetings
+                if m.status == MeetingStatus.DONE.value
+            )
+
+            # Get last meeting
+            last_meeting = (
+                max(meetings, key=lambda m: m.start_time) if meetings else None
+            )
+
+            client_stat = ClientStatsResponse(
+                client_id=UUID(client.id),
+                client_name=client.name,
+                total_meetings=total_meetings,
+                done_meetings=done_meetings,
+                canceled_meetings=canceled_meetings,
+                total_revenue=total_revenue,
+                total_hours=total_hours,
+                last_meeting=last_meeting.start_time if last_meeting else None,
+            )
+
+            client_stats.append(client_stat)
+
+        return client_stats
+
+    async def get_daily_breakdown(
+        self,
+        user_id: UUID,
+        start_date: datetime,
+        end_date: datetime,
+        service_id: UUID | None = None,
+    ) -> list[DailyBreakdownItem]:
+        """Get daily breakdown of revenue and meetings for a user (UTC, excludes canceled)"""
+        query = self.db.query(MeetingModel).filter(
+            MeetingModel.user_id == str(user_id),
+            MeetingModel.start_time >= start_date,
+            MeetingModel.start_time <= end_date,
+            MeetingModel.status.in_(
+                [MeetingStatus.DONE.value, MeetingStatus.UPCOMING.value]
+            ),
+        )
+        if service_id:
+            query = query.filter(MeetingModel.service_id == str(service_id))
+        meetings = query.all()
+        # Group by day (UTC)
+        from collections import defaultdict
+
+        day_map = defaultdict(lambda: {"revenue": 0.0, "meeting_ids": []})
+        for m in meetings:
+            # Use UTC date
+            day = m.start_time.astimezone(UTC).date().isoformat()
+            if m.status == MeetingStatus.DONE.value:
+                day_map[day]["revenue"] += float(m.price_total)
+            day_map[day]["meeting_ids"].append(m.id)
+        # Build result list for each day in range
+        result = []
+        current = start_date.date()
+        while current <= end_date.date():
+            day_str = current.isoformat()
+            info = day_map.get(day_str, {"revenue": 0.0, "meeting_ids": []})
+            result.append(
+                DailyBreakdownItem(
+                    date=day_str,
+                    revenue=info["revenue"],
+                    meetings_count=len(info["meeting_ids"]),
+                    meeting_ids=info["meeting_ids"],
+                )
+            )
+            current += timedelta(days=1)
+        return result

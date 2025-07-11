@@ -4,10 +4,19 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # Environment
+    environment: str = os.getenv("ENVIRONMENT", "dev").lower()
+
+    # Test data configuration
+    create_test_data: bool = os.getenv("CREATE_TEST_DATA", "false").lower() == "true"
+
     # Supabase configuration
     supabase_url: str = os.getenv("SUPABASE_URL", "")
     supabase_key: str = os.getenv("SUPABASE_KEY", "")
     supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+
+    # Database settings
+    database_path: str = os.getenv("DATABASE_PATH", "database.sqlite")
 
     # Application settings
     debug: bool = os.getenv("DEBUG", "False").lower() == "true"
