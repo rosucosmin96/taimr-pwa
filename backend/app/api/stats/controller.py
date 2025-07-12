@@ -50,6 +50,26 @@ async def get_client_stats(
     return await service.get_client_stats(user_id, start_date, end_date, service_id)
 
 
+@router.get("/clients/{client_id}", response_model=ClientStatsResponse)
+async def get_single_client_stats(
+    client_id: UUID,
+    start_date: datetime | None = Query(
+        None, description="Start datetime (UTC, ISO 8601) for custom period (inclusive)"
+    ),
+    end_date: datetime | None = Query(
+        None, description="End datetime (UTC, ISO 8601) for custom period (inclusive)"
+    ),
+    service_id: UUID | None = Query(None),
+    user_id: UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Get statistics for a single client for the current user."""
+    service = StatsService(db)
+    return await service.get_single_client_stats(
+        str(user_id), str(client_id), start_date, end_date, str(service_id)
+    )
+
+
 @router.get("/daily_breakdown", response_model=list[DailyBreakdownItem])
 async def get_daily_breakdown(
     start_date: datetime = Query(

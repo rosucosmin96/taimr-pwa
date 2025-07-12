@@ -37,6 +37,7 @@ import {
   GridItem
 } from '@chakra-ui/react';
 import { apiClient, StatsOverview, Service, DailyBreakdownItem } from '../lib/api';
+import ClientStatisticsModal from '../components/ClientStatisticsModal';
 
 interface ServiceStats {
   serviceId: string;
@@ -98,6 +99,8 @@ const Stats: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [dailyBreakdown, setDailyBreakdown] = useState<DailyBreakdownItem[]>([]);
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
   // Responsive breakpoints
   const isMobile = useBreakpointValue({ base: true, md: false });
@@ -218,42 +221,24 @@ const Stats: React.FC = () => {
         // Fetch client statistics
         if (startDateParam && endDateParam) {
           try {
-            const clients = await apiClient.getClients(serviceIdParam);
-            const clientStatsPromises = clients.map(async (client) => {
-              try {
-                // For now, we'll use mock data since the API doesn't have client-specific stats
-                // In a real implementation, you'd have an endpoint like /stats/client/{client_id}
-                const mockClientStats = {
-                  clientId: client.id,
-                  clientName: client.name,
-                  totalMeetings: Math.floor(Math.random() * 10) + 1,
-                  canceledMeetings: Math.floor(Math.random() * 3),
-                  totalRevenue: Math.random() * 1000 + 100,
-                  pricePerHour: client.custom_price_per_hour || 50,
-                  hours: Math.random() * 20 + 2
-                };
-
-                return {
-                  ...mockClientStats,
-                  pricePerMeeting: mockClientStats.totalRevenue / mockClientStats.totalMeetings
-                };
-              } catch (err) {
-                console.error(`Failed to fetch stats for client ${client.name}:`, err);
-                return {
-                  clientId: client.id,
-                  clientName: client.name,
-                  totalMeetings: 0,
-                  canceledMeetings: 0,
-                  totalRevenue: 0,
-                  pricePerHour: client.custom_price_per_hour || 0,
-                  hours: 0,
-                  pricePerMeeting: 0
-                };
-              }
-            });
-
-            const clientStatsData = await Promise.all(clientStatsPromises);
-            setClientStats(clientStatsData);
+            const clientStatsData = await apiClient.getClientStats(startDateParam, endDateParam, serviceIdParam);
+            setClientStats(clientStatsData.map(item => {
+              const stats = item.client_stats;
+              const totalRevenue = stats.total_revenue;
+              const totalMeetings = stats.total_meetings;
+              const hours = stats.total_hours;
+              return {
+                clientId: stats.client_id,
+                clientName: stats.client_name,
+                totalMeetings,
+                canceledMeetings: stats.canceled_meetings,
+                totalRevenue,
+                pricePerHour: hours > 0 ? totalRevenue / hours : 0,
+                hours,
+                pricePerMeeting: totalMeetings > 0 ? totalRevenue / totalMeetings : 0,
+                // Optionally, you can add: meetings: item.meetings
+              };
+            }));
           } catch (err) {
             console.error('Failed to fetch client stats:', err);
             setClientStats([]);
@@ -330,6 +315,10 @@ const Stats: React.FC = () => {
     if (previous === 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous) * 100;
   };
+
+  // Add helper function for safe formatting
+  const safeToFixed = (value: number | undefined | null, digits = 2) =>
+    typeof value === 'number' && !isNaN(value) ? value.toFixed(digits) : '0.00';
 
   // Filter clients based on search term
   const filteredClientStats = clientStats.filter(client =>
@@ -934,19 +923,19 @@ const Stats: React.FC = () => {
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Revenue</Text>
-                                <Text fontWeight="bold" color="green.600" fontSize={{ base: "sm", md: "md" }}>${client.totalRevenue.toFixed(2)}</Text>
+                                <Text fontWeight="bold" color="green.600" fontSize={{ base: "sm", md: "md" }}>${safeToFixed(client.totalRevenue)}</Text>
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Price/Hour</Text>
-                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${client.pricePerHour.toFixed(2)}</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${safeToFixed(client.pricePerHour)}</Text>
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Hours</Text>
-                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{client.hours.toFixed(1)}h</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{safeToFixed(client.hours, 1)}h</Text>
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Price/Meeting</Text>
-                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${client.pricePerMeeting.toFixed(2)}</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${safeToFixed(client.pricePerMeeting)}</Text>
                               </Box>
                             </SimpleGrid>
                           </VStack>
@@ -971,14 +960,21 @@ const Stats: React.FC = () => {
                         </Thead>
                         <Tbody>
                           {filteredClientStats.map((client) => (
-                            <Tr key={client.clientId}>
+                            <Tr
+                              key={client.clientId}
+                              onClick={() => {
+                                setSelectedClientId(client.clientId);
+                                setModalOpen(true);
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            >
                               <Td fontWeight="medium" fontSize={{ base: "xs", md: "sm" }}>{client.clientName}</Td>
                               <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.totalMeetings}</Td>
                               <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.canceledMeetings}</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${client.totalRevenue.toFixed(2)}</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${client.pricePerHour.toFixed(2)}</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.hours.toFixed(1)}h</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${client.pricePerMeeting.toFixed(2)}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${safeToFixed(client.totalRevenue)}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${safeToFixed(client.pricePerHour)}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{safeToFixed(client.hours, 1)}h</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${safeToFixed(client.pricePerMeeting)}</Td>
                             </Tr>
                           ))}
                         </Tbody>
@@ -996,6 +992,16 @@ const Stats: React.FC = () => {
               </Box>
             </Box>
           )}
+
+          {/* Client Statistics Modal */}
+          <ClientStatisticsModal
+            isOpen={modalOpen}
+            onClose={() => setModalOpen(false)}
+            clientId={selectedClientId || ''}
+            startDate={startDate}
+            endDate={endDate}
+            serviceId={selectedService !== 'all' ? selectedService : undefined}
+          />
         </Stack>
       )}
     </ResponsiveContentWrapper>

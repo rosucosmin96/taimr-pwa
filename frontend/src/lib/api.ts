@@ -159,6 +159,24 @@ export interface MembershipUpdateRequest {
   paid?: boolean;
 }
 
+export interface ClientStats {
+  client_id: string;
+  client_name: string;
+  total_meetings: number;
+  done_meetings: number;
+  canceled_meetings: number;
+  total_revenue: number;
+  total_hours: number;
+  last_meeting?: string | null;
+  price_per_hour?: number;
+  price_per_meeting?: number;
+}
+
+export interface ClientStatsResponse {
+  client_stats: ClientStats;
+  meetings: Meeting[];
+}
+
 // API client with authentication
 class ApiClient {
   private baseUrl: string;
@@ -370,6 +388,18 @@ class ApiClient {
     return this.request<StatsOverview>(`/stats/overview?${params}`);
   }
 
+  async getClientStats(
+    startDate?: string,
+    endDate?: string,
+    serviceId?: string
+  ): Promise<ClientStatsResponse[]> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    if (serviceId) params.append('service_id', serviceId);
+    return this.request<ClientStatsResponse[]>(`/stats/clients?${params}`);
+  }
+
   async getDailyBreakdown(startDate: string, endDate: string, serviceId?: string): Promise<DailyBreakdownItem[]> {
     const params = new URLSearchParams({
       start_date: startDate,
@@ -377,6 +407,19 @@ class ApiClient {
     });
     if (serviceId) params.append('service_id', serviceId);
     return this.request<DailyBreakdownItem[]>(`/stats/daily_breakdown?${params}`);
+  }
+
+  async getSingleClientStats(
+    clientId: string,
+    startDate?: string,
+    endDate?: string,
+    serviceId?: string
+  ): Promise<ClientStatsResponse> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    if (serviceId) params.append('service_id', serviceId);
+    return this.request<ClientStatsResponse>(`/stats/clients/${clientId}?${params}`);
   }
 
   // Memberships API

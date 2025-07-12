@@ -54,6 +54,12 @@ class MeetingResponse(MeetingBase):
     user_id: UUID
     price_total: float
     created_at: datetime
+    start_time: datetime
+    end_time: datetime
+    title: str | None = None
+    status: str
+    paid: bool
+    price_per_hour: float
 
     class Config:
         from_attributes = True

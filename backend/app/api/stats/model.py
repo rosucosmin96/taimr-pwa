@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.api.meetings.model import MeetingResponse
+
 
 class StatsOverview(BaseModel):
     total_meetings: int
@@ -33,7 +35,7 @@ class ClientStats(BaseModel):
 
 class ClientStatsResponse(BaseModel):
     client_stats: ClientStats
-    meetings: list[dict]  # Will contain meeting details
+    meetings: list[MeetingResponse]  # Will contain meeting details
 
 
 class DailyBreakdownItem(BaseModel):
