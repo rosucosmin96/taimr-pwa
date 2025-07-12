@@ -4,13 +4,13 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.api.commons.shared import RecurrenceUpdateScope
 from app.api.meetings.model import (
     MeetingCreateRequest,
     MeetingResponse,
     MeetingStatus,
     MeetingUpdateRequest,
 )
-from app.api.shared import RecurrenceUpdateScope
 from app.models import Meeting as MeetingModel
 
 

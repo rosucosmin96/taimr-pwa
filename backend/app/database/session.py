@@ -5,8 +5,14 @@ from sqlalchemy.orm import Session
 from .factory import DatabaseFactory
 
 
+def get_db_session() -> Session:
+    """Get a database session."""
+    db_provider = DatabaseFactory.get_current_provider()
+    return db_provider.get_session()
+
+
 def get_db() -> Generator[Session]:
-    """Dependency to get database session."""
+    """FastAPI dependency to get database session."""
     db_provider = DatabaseFactory.get_current_provider()
     db = db_provider.get_session()
     try:
@@ -16,5 +22,5 @@ def get_db() -> Generator[Session]:
 
 
 def get_db_provider():
-    """Dependency to get database provider."""
+    """Get database provider."""
     return DatabaseFactory.get_current_provider()

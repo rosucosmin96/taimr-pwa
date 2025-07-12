@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.stats.model import (
     ClientStatsResponse,
-    DailyBreakdownItem,  # <-- add import
+    DailyBreakdownItem,
     StatsOverview,
 )
 from app.models import Client as ClientModel
@@ -25,22 +25,16 @@ class StatsService:
         end_date: datetime | None = None,
         service_id: UUID | None = None,
     ) -> StatsOverview:
-        """Get overview statistics for a user"""
+        """Get overview statistics for a user (all calculations in Python)"""
         query = self.db.query(MeetingModel).filter(MeetingModel.user_id == str(user_id))
-
-        # Apply datetime filters (UTC)
         if start_date:
             query = query.filter(MeetingModel.start_time >= start_date)
         if end_date:
             query = query.filter(MeetingModel.start_time <= end_date)
-
-        # Apply service filter
         if service_id:
             query = query.filter(MeetingModel.service_id == str(service_id))
-
         meetings = query.all()
 
-        # Calculate statistics
         total_meetings = len(meetings)
         done_meetings = len(
             [m for m in meetings if m.status == MeetingStatus.DONE.value]
@@ -48,21 +42,18 @@ class StatsService:
         canceled_meetings = len(
             [m for m in meetings if m.status == MeetingStatus.CANCELED.value]
         )
-
-        # Get unique clients
-        client_ids = list({m.client_id for m in meetings})
+        client_ids = {m.client_id for m in meetings}
         total_clients = len(client_ids)
-
-        # Calculate revenue and hours
         total_revenue = sum(
-            m.price_total for m in meetings if m.status == MeetingStatus.DONE.value
+            float(m.price_total)
+            for m in meetings
+            if m.status == MeetingStatus.DONE.value
         )
         total_hours = sum(
             (m.end_time - m.start_time).total_seconds() / 3600
             for m in meetings
             if m.status == MeetingStatus.DONE.value
         )
-
         return StatsOverview(
             total_meetings=total_meetings,
             done_meetings=done_meetings,
@@ -79,8 +70,7 @@ class StatsService:
         end_date: datetime | None = None,
         service_id: UUID | None = None,
     ) -> list[ClientStatsResponse]:
-        """Get client statistics for a user"""
-        # Get all clients for the user
+        """Get client statistics for a user (all calculations in Python)"""
         clients_query = self.db.query(ClientModel).filter(
             ClientModel.user_id == str(user_id)
         )
@@ -88,20 +78,15 @@ class StatsService:
             clients_query = clients_query.filter(
                 ClientModel.service_id == str(service_id)
             )
-
         clients = clients_query.all()
         client_stats = []
-
         for client in clients:
-            # Get meetings for this client
             meetings_query = self.db.query(MeetingModel).filter(
                 and_(
                     MeetingModel.user_id == str(user_id),
                     MeetingModel.client_id == client.id,
                 )
             )
-
-            # Apply datetime filters (UTC)
             if start_date:
                 meetings_query = meetings_query.filter(
                     MeetingModel.start_time >= start_date
@@ -110,13 +95,9 @@ class StatsService:
                 meetings_query = meetings_query.filter(
                     MeetingModel.start_time <= end_date
                 )
-
             meetings = meetings_query.all()
-
             if not meetings:
                 continue
-
-            # Calculate client statistics
             total_meetings = len(meetings)
             done_meetings = len(
                 [m for m in meetings if m.status == MeetingStatus.DONE.value]
@@ -124,21 +105,19 @@ class StatsService:
             canceled_meetings = len(
                 [m for m in meetings if m.status == MeetingStatus.CANCELED.value]
             )
-
             total_revenue = sum(
-                m.price_total for m in meetings if m.status == MeetingStatus.DONE.value
+                float(m.price_total)
+                for m in meetings
+                if m.status == MeetingStatus.DONE.value
             )
             total_hours = sum(
                 (m.end_time - m.start_time).total_seconds() / 3600
                 for m in meetings
                 if m.status == MeetingStatus.DONE.value
             )
-
-            # Get last meeting
             last_meeting = (
                 max(meetings, key=lambda m: m.start_time) if meetings else None
             )
-
             client_stat = ClientStatsResponse(
                 client_id=UUID(client.id),
                 client_name=client.name,
@@ -149,9 +128,7 @@ class StatsService:
                 total_hours=total_hours,
                 last_meeting=last_meeting.start_time if last_meeting else None,
             )
-
             client_stats.append(client_stat)
-
         return client_stats
 
     async def get_daily_breakdown(
@@ -161,7 +138,7 @@ class StatsService:
         end_date: datetime,
         service_id: UUID | None = None,
     ) -> list[DailyBreakdownItem]:
-        """Get daily breakdown of revenue and meetings for a user (UTC, excludes canceled)"""
+        """Get daily breakdown of revenue and meetings for a user (all calculations in Python)"""
         query = self.db.query(MeetingModel).filter(
             MeetingModel.user_id == str(user_id),
             MeetingModel.start_time >= start_date,
@@ -178,7 +155,6 @@ class StatsService:
 
         day_map = defaultdict(lambda: {"revenue": 0.0, "meeting_ids": []})
         for m in meetings:
-            # Use UTC date
             day = m.start_time.astimezone(UTC).date().isoformat()
             if m.status == MeetingStatus.DONE.value:
                 day_map[day]["revenue"] += float(m.price_total)
