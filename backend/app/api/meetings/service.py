@@ -61,6 +61,7 @@ class MeetingService:
             client_id=str(meeting.client_id),
             title=meeting.title,
             recurrence_id=str(meeting.recurrence_id) if meeting.recurrence_id else None,
+            membership_id=str(meeting.membership_id) if meeting.membership_id else None,
             start_time=meeting.start_time,
             end_time=meeting.end_time,
             price_per_hour=meeting.price_per_hour,
@@ -76,6 +77,15 @@ class MeetingService:
         self.db.add(db_meeting)
         self.db.commit()
         self.db.refresh(db_meeting)
+
+        # If this is the first meeting for a membership, set the start date
+        if meeting.membership_id:
+            from app.api.memberships.service import MembershipService
+
+            membership_service = MembershipService(self.db)
+            await membership_service.set_membership_start_date(
+                meeting.membership_id, meeting.start_time
+            )
 
         return self._to_response(db_meeting)
 
@@ -116,6 +126,10 @@ class MeetingService:
             meeting.client_id = str(update_data.client_id)
         if update_data.title is not None:
             meeting.title = update_data.title
+        if update_data.recurrence_id is not None:
+            meeting.recurrence_id = str(update_data.recurrence_id)
+        if update_data.membership_id is not None:
+            meeting.membership_id = str(update_data.membership_id)
         if update_data.start_time is not None:
             meeting.start_time = update_data.start_time
         if update_data.end_time is not None:
@@ -246,6 +260,9 @@ class MeetingService:
             title=meeting.title,
             recurrence_id=(
                 UUID(meeting.recurrence_id) if meeting.recurrence_id else None
+            ),
+            membership_id=(
+                UUID(meeting.membership_id) if meeting.membership_id else None
             ),
             start_time=meeting.start_time,
             end_time=meeting.end_time,

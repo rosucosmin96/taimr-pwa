@@ -31,6 +31,7 @@ export interface Meeting {
   client_id: string;
   title?: string;
   recurrence_id?: string;
+  membership_id?: string;
   start_time: string;
   end_time: string;
   price_per_hour: number;
@@ -114,6 +115,41 @@ export interface DailyBreakdownItem {
   revenue: number;
   meetings_count: number;
   meeting_ids: string[];
+}
+
+// Membership types
+export interface Membership {
+  id: string;
+  user_id: string;
+  service_id: string;
+  client_id: string;
+  name: string;
+  total_meetings: number;
+  price_per_membership: number;
+  price_per_meeting: number;
+  availability_days: number;
+  status: 'active' | 'expired' | 'canceled';
+  paid: boolean;
+  start_date?: string;
+  created_at: string;
+}
+
+export interface MembershipCreateRequest {
+  service_id: string;
+  client_id: string;
+  name: string;
+  total_meetings: number;
+  price_per_membership: number;
+  availability_days: number;
+}
+
+export interface MembershipUpdateRequest {
+  name?: string;
+  total_meetings?: number;
+  price_per_membership?: number;
+  availability_days?: number;
+  status?: 'active' | 'expired' | 'canceled';
+  paid?: boolean;
 }
 
 // API client with authentication
@@ -242,6 +278,7 @@ class ApiClient {
     client_id: string;
     title?: string;
     recurrence_id?: string;
+    membership_id?: string;
     start_time: string;
     end_time: string;
     price_per_hour: number;
@@ -333,6 +370,39 @@ class ApiClient {
     });
     if (serviceId) params.append('service_id', serviceId);
     return this.request<DailyBreakdownItem[]>(`/stats/daily_breakdown?${params}`);
+  }
+
+  // Memberships API
+  async getMemberships(): Promise<Membership[]> {
+    return this.request<Membership[]>('/memberships/');
+  }
+
+  async createMembership(data: MembershipCreateRequest): Promise<Membership> {
+    return this.request<Membership>('/memberships/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateMembership(id: string, data: MembershipUpdateRequest): Promise<Membership> {
+    return this.request<Membership>(`/memberships/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMembership(id: string): Promise<void> {
+    await this.request(`/memberships/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getActiveMembership(clientId: string): Promise<Membership | null> {
+    return this.request<Membership | null>(`/memberships/active/${clientId}`);
+  }
+
+  async getMembershipMeetings(membershipId: string): Promise<Meeting[]> {
+    return this.request<Meeting[]>(`/memberships/${membershipId}/meetings`);
   }
 }
 

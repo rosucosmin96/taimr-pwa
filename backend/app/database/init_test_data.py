@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models.meeting import MeetingStatus
 
-from ..models import Client, Meeting, Service, User
+from ..models import Client, Meeting, Membership, Service, User
 from .factory import DatabaseFactory
 
 logger = logging.getLogger(__name__)
@@ -126,7 +126,11 @@ def create_test_clients(
 
 
 def create_test_meetings(
-    session: Session, user_id: str, services: list[Service], clients: list[Client]
+    session: Session,
+    user_id: str,
+    services: list[Service],
+    clients: list[Client],
+    memberships: list[Membership],
 ) -> list[Meeting]:
     """Create test meetings if they don't exist."""
     # Check if meetings already exist
@@ -145,6 +149,7 @@ def create_test_meetings(
             client_id=clients[0].id,
             title="Website Consultation",
             recurrence_id=None,
+            membership_id=memberships[0].id,  # John's membership
             start_time=datetime.combine(today, datetime.min.time().replace(hour=9)),
             end_time=datetime.combine(today, datetime.min.time().replace(hour=11)),
             price_per_hour=80.0,
@@ -159,6 +164,7 @@ def create_test_meetings(
             client_id=clients[1].id,
             title="Logo Design",
             recurrence_id=None,
+            membership_id=memberships[1].id,  # Sarah's membership
             start_time=datetime.combine(
                 today + timedelta(days=1), datetime.min.time().replace(hour=14)
             ),
@@ -178,6 +184,7 @@ def create_test_meetings(
             client_id=clients[2].id,
             title="Business Strategy",
             recurrence_id=None,
+            membership_id=None,  # No membership for this meeting
             start_time=datetime.combine(
                 today + timedelta(days=2), datetime.min.time().replace(hour=10)
             ),
@@ -196,6 +203,70 @@ def create_test_meetings(
     session.commit()
     logger.info("✅ Created test meetings")
     return meetings
+
+
+def create_test_memberships(
+    session: Session, user_id: str, services: list[Service], clients: list[Client]
+) -> list[Membership]:
+    """Create test memberships if they don't exist."""
+    # Check if memberships already exist
+    existing_memberships = (
+        session.query(Membership).filter(Membership.user_id == user_id).all()
+    )
+    if existing_memberships:
+        logger.info(f"Found {len(existing_memberships)} existing test memberships")
+        return existing_memberships
+
+    memberships = [
+        Membership(
+            id=str(uuid4()),
+            user_id=user_id,
+            service_id=services[0].id,  # Web Development
+            client_id=clients[0].id,  # John Smith
+            name="John's Web Development Package",
+            total_meetings=10,
+            price_per_membership=800.0,
+            price_per_meeting=80.0,
+            availability_days=90,
+            status="active",
+            paid=True,
+            start_date=datetime.now(UTC) - timedelta(days=30),
+        ),
+        Membership(
+            id=str(uuid4()),
+            user_id=user_id,
+            service_id=services[1].id,  # Graphic Design
+            client_id=clients[1].id,  # Sarah Johnson
+            name="Sarah's Design Package",
+            total_meetings=5,
+            price_per_membership=300.0,
+            price_per_meeting=60.0,
+            availability_days=60,
+            status="active",
+            paid=False,
+            start_date=datetime.now(UTC) - timedelta(days=15),
+        ),
+        Membership(
+            id=str(uuid4()),
+            user_id=user_id,
+            service_id=services[2].id,  # Consulting
+            client_id=clients[2].id,  # Mike Wilson
+            name="Mike's Consulting Package",
+            total_meetings=8,
+            price_per_membership=880.0,
+            price_per_meeting=110.0,
+            availability_days=120,
+            status="expired",
+            paid=True,
+            start_date=datetime.now(UTC) - timedelta(days=150),
+        ),
+    ]
+
+    for membership in memberships:
+        session.add(membership)
+    session.commit()
+    logger.info("✅ Created test memberships")
+    return memberships
 
 
 def init_test_data() -> bool:
@@ -224,13 +295,18 @@ def init_test_data() -> bool:
             # Create test clients
             clients = create_test_clients(session, user.id, services)
 
+            # Create test memberships
+            memberships = create_test_memberships(session, user.id, services, clients)
+
             # Create test meetings
-            meetings = create_test_meetings(session, user.id, services, clients)
+            meetings = create_test_meetings(
+                session, user.id, services, clients, memberships
+            )
 
             logger.info("🎉 Test data initialization completed successfully!")
             logger.info(f"Database URL: {db_provider.get_url()}")
             logger.info(
-                f"Test data summary: 1 user, {len(services)} services, {len(clients)} clients, {len(meetings)} meetings"
+                f"Test data summary: 1 user, {len(services)} services, {len(clients)} clients, {len(meetings)} meetings, {len(memberships)} memberships"
             )
 
             return True

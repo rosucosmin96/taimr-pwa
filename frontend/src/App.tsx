@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Services from './pages/Services';
 import Meetings from './pages/Meetings';
 import Clients from './pages/Clients';
+import Memberships from './pages/Memberships';
 import Stats from './pages/Stats';
 import Profile from './pages/Profile';
 import Calendar from './pages/Calendar';
@@ -16,6 +17,7 @@ const navItems = [
   { name: 'Meetings', path: '/meetings' },
   { name: 'Clients', path: '/clients' },
   { name: 'Services', path: '/services' },
+  { name: 'Memberships', path: '/memberships' },
   { name: 'Statistics', path: '/stats' },
   { name: 'Calendar', path: '/calendar' },
 ];
@@ -193,6 +195,7 @@ const App: React.FC = () => (
           <Route path="/services" element={<Services />} />
           <Route path="/meetings" element={<Meetings />} />
           <Route path="/clients" element={<Clients />} />
+          <Route path="/memberships" element={<Memberships />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/profile" element={<Profile />} />
