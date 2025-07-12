@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Box,
   Flex,
@@ -35,6 +35,12 @@ import {
   Select,
   Checkbox,
   IconButton,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverBody,
+  VStack as ChakraVStack,
+  Stack as ChakraStack,
 } from '@chakra-ui/react';
 import { MagnifyingGlassIcon, FunnelIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { UserIcon } from '@heroicons/react/24/solid';
@@ -52,7 +58,10 @@ const Memberships: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const onFilterOpen = () => setIsFilterOpen(true);
+  const onFilterClose = () => setIsFilterOpen(false);
+  const onFilterToggle = () => setIsFilterOpen((v) => !v);
   const [selectedMembership, setSelectedMembership] = useState<Membership | null>(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [batchEditOpen, setBatchEditOpen] = useState(false);
@@ -67,6 +76,24 @@ const Memberships: React.FC = () => {
   const allSelected = filteredMemberships.length > 0 && filteredMemberships.every(m => selectedIds.includes(m.id));
   const toggleAll = () => setSelectedIds(allSelected ? [] : filteredMemberships.map(m => m.id));
   const toggleOne = (id: string) => setSelectedIds(selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : [...selectedIds, id]);
+
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const [controlsWrapped, setControlsWrapped] = useState(false);
+
+  // Responsive controls layout logic
+  useEffect(() => {
+    function checkWrap() {
+      if (!controlsRef.current) return;
+      const container = controlsRef.current;
+      // Safe margin (e.g., 32px)
+      const safeMargin = 32;
+      // Compare scrollWidth (total needed) to clientWidth (available)
+      setControlsWrapped(container.scrollWidth + safeMargin > container.clientWidth);
+    }
+    checkWrap();
+    window.addEventListener('resize', checkWrap);
+    return () => window.removeEventListener('resize', checkWrap);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -119,8 +146,6 @@ const Memberships: React.FC = () => {
   );
 
   // Filter modal handlers
-  const openFilterModal = () => setFilterModalOpen(true);
-  const closeFilterModal = () => setFilterModalOpen(false);
   const clearFilters = () => {
     setStatusFilter('all');
     setPaymentFilter('all');
@@ -143,143 +168,203 @@ const Memberships: React.FC = () => {
     // open MembershipViewModal here
   };
 
+  // Track if any filters are active
+  const hasActiveFilters =
+    statusFilter !== 'all' || paymentFilter !== 'all' || serviceFilter !== 'all';
+
+  // Status badge styles (similar to Meetings)
+  const statusStyles: Record<string, { bg: string; color: string }> = {
+    'active': { bg: 'green.100', color: 'green.700' },
+    'expired': { bg: 'red.100', color: 'red.700' },
+    'canceled': { bg: 'gray.200', color: 'gray.600' },
+  };
+
   return (
-    <Box p={8} bg="gray.50" minH="100vh">
-      <Flex mb={6} justify="space-between" align="center">
-        <Heading size="xl">Memberships</Heading>
-      </Flex>
-      <Flex mb={4} align="center" gap={2}>
-        <InputGroup maxW="320px">
+    <ChakraStack spacing={8} px={{ base: 2, md: 8 }} py={4}>
+      <Heading as="h1" size="lg" mb={4}>Memberships</Heading>
+      {/* Search and Filter Bar */}
+      <Flex gap={4} align="center" flexWrap="wrap">
+        <InputGroup maxW="400px">
           <InputLeftElement pointerEvents="none">
-            <MagnifyingGlassIcon width={18} />
+            <MagnifyingGlassIcon style={{ width: 20, height: 20, color: '#718096' }} />
           </InputLeftElement>
           <Input
             placeholder="Search memberships..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            borderRadius="lg"
           />
         </InputGroup>
-        <Button leftIcon={<FunnelIcon width={18} />} onClick={openFilterModal} variant="outline">
-          Filters
-        </Button>
-        <Button variant="link" ml={2} onClick={clearFilters} colorScheme="gray">
-          Clear Filters
-        </Button>
+        <Popover isOpen={isFilterOpen} onClose={onFilterClose}>
+          <PopoverTrigger>
+            <Button
+              leftIcon={<FunnelIcon style={{ width: 20, height: 20 }} />}
+              variant={hasActiveFilters ? "solid" : "outline"}
+              colorScheme={hasActiveFilters ? "purple" : "gray"}
+              borderRadius="lg"
+              onClick={onFilterToggle}
+            >
+              Filters
+              {hasActiveFilters && (
+                <Badge ml={2} colorScheme="purple" borderRadius="full" fontSize="xs">
+                  {[statusFilter, paymentFilter, serviceFilter].filter(v => v !== '' && v !== 'all').length}
+                </Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent p={4} w="300px">
+            <PopoverBody>
+              <VStack spacing={4} align="stretch">
+                <Text fontWeight="semibold" fontSize="sm">Filter Options</Text>
+                <Box>
+                  <Text fontSize="sm" fontWeight="medium" mb={2}>Status</Text>
+                  <Select size="sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                    <option value="all">All</option>
+                    <option value="active">Active</option>
+                    <option value="expired">Expired</option>
+                    <option value="canceled">Canceled</option>
+                  </Select>
+                </Box>
+                <Box>
+                  <Text fontSize="sm" fontWeight="medium" mb={2}>Payment</Text>
+                  <Select size="sm" value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)}>
+                    <option value="all">All</option>
+                    <option value="paid">Paid</option>
+                    <option value="unpaid">Unpaid</option>
+                  </Select>
+                </Box>
+                <Box>
+                  <Text fontSize="sm" fontWeight="medium" mb={2}>Service</Text>
+                  <Select size="sm" value={serviceFilter} onChange={e => setServiceFilter(e.target.value)}>
+                    <option value="all">All</option>
+                    {services.map(service => (
+                      <option key={service.id} value={service.id}>{service.name}</option>
+                    ))}
+                  </Select>
+                </Box>
+                <Divider />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  colorScheme="red"
+                  onClick={clearFilters}
+                >
+                  Clear All Filters
+                </Button>
+              </VStack>
+            </PopoverBody>
+          </PopoverContent>
+        </Popover>
       </Flex>
-      <Box bg="white" borderRadius="xl" boxShadow="sm" p={0} mt={4}>
-        {/* Batch Actions Bar */}
-        {selectedIds.length > 0 && (
-          <Flex px={6} py={3} align="center" gap={2} bg="gray.50" borderBottom="1px solid #F1F1F1">
-            <Text fontWeight="medium">{selectedIds.length} selected</Text>
-            <Button size="sm" leftIcon={<PencilIcon width={16} />} colorScheme="blue" onClick={() => setBatchEditOpen(true)}>
-              Batch Edit
-            </Button>
-            <Button size="sm" leftIcon={<TrashIcon width={16} />} colorScheme="red" onClick={() => setBatchDeleteOpen(true)}>
-              Batch Delete
-            </Button>
-          </Flex>
-        )}
-        <Flex px={6} py={4} align="center" justify="space-between" borderBottom="1px solid #F1F1F1">
-          <Flex align="center" gap={2}>
-            <Checkbox isChecked={allSelected} onChange={toggleAll} mr={4} />
-            <Text fontWeight="bold" color="gray.700">Your Memberships</Text>
-          </Flex>
-          <Button colorScheme="purple" leftIcon={<UserIcon width={18} />} onClick={() => setAddModalOpen(true)}>
+      {/* Batch action bar above the memberships list */}
+      {selectedIds.length > 0 && (
+        <Flex mb={4} gap={2} align="center">
+          <Text fontWeight="medium">{selectedIds.length} selected</Text>
+          <Button size="sm" colorScheme="blue" onClick={() => setBatchEditOpen(true)}>Batch Edit</Button>
+          <Button size="sm" colorScheme="red" onClick={() => setBatchDeleteOpen(true)}>Batch Delete</Button>
+        </Flex>
+      )}
+      {/* Memberships List */}
+      <Box
+        bg="white"
+        rounded="xl"
+        shadow="md"
+        p={6}
+        w="100%"
+        minWidth={0}
+        overflowX="auto"
+      >
+        <Flex justify="space-between" align="center" mb={4} minWidth={0}>
+          <HStack minWidth={0}>
+            <Checkbox
+              isChecked={allSelected}
+              isIndeterminate={selectedIds.length > 0 && !allSelected}
+              onChange={toggleAll}
+              mr={2}
+            />
+            <Text fontWeight="semibold" fontSize="lg" isTruncated>
+              Your Memberships
+              {filteredMemberships.length !== memberships.length && (
+                <Text as="span" color="gray.500" fontWeight="normal" ml={2}>
+                  ({filteredMemberships.length} of {memberships.length})
+                </Text>
+              )}
+            </Text>
+          </HStack>
+          <Button
+            leftIcon={<UserIcon width={18} />}
+            colorScheme="purple"
+            borderRadius="lg"
+            onClick={() => setAddModalOpen(true)}
+            ml={3}
+          >
             Add Membership
           </Button>
         </Flex>
-        <Box>
-          {filteredMemberships.length === 0 ? (
-            <Box textAlign="center" py={8} color="gray.400">No memberships found</Box>
-          ) : (
-            filteredMemberships.map((membership) => (
-              <Flex
-                key={membership.id}
-                align="center"
-                px={6}
-                py={4}
-                borderBottom="1px solid #F1F1F1"
-                bg={selectedIds.includes(membership.id) ? 'gray.50' : 'white'}
-                _hover={{ bg: 'gray.50', cursor: 'pointer' }}
-                onClick={() => handleRowClick(membership)}
-              >
-                <Box
-                  onClick={e => { e.stopPropagation(); }}
-                  mr={4}
-                  p={1}
-                  borderRadius="md"
-                  _hover={{ bg: 'gray.100' }}
-                  cursor="pointer"
-                >
-                  <Checkbox
-                    isChecked={selectedIds.includes(membership.id)}
-                    onChange={() => toggleOne(membership.id)}
-                  />
-                </Box>
-                <Flex align="center" justify="center" w={10} h={10} bg="purple.100" borderRadius="full" mr={4} fontWeight="bold" color="purple.700">
-                  {membership.name.charAt(0).toUpperCase()}
-                </Flex>
-                <Box flex={1} minW={0}>
-                  <Text fontWeight="semibold" color="gray.800" isTruncated>{membership.name}</Text>
-                  <Text fontSize="sm" color="gray.500" isTruncated>
-                    {getClientName(membership.client_id)} • {getServiceName(membership.service_id)}
-                  </Text>
-                </Box>
-                <Flex gap={2} ml={4}>
-                  <Badge colorScheme={membership.status === 'active' ? 'green' : membership.status === 'expired' ? 'red' : 'gray'}>
-                    {membership.status.toUpperCase()}
+        <ChakraStack divider={<Box borderBottomWidth={1} borderColor="gray.100" />} minWidth={0}>
+          {filteredMemberships.map((membership) => (
+            <Flex
+              key={membership.id}
+              align="flex-start"
+              py={4}
+              cursor="pointer"
+              _hover={{ bg: 'gray.50' }}
+              onClick={() => handleRowClick(membership)}
+              transition="background-color 0.2s"
+              gap={2}
+              minWidth={0}
+            >
+              <Box onClick={e => { e.stopPropagation(); }} mt={1}>
+                <Checkbox
+                  isChecked={selectedIds.includes(membership.id)}
+                  onChange={() => toggleOne(membership.id)}
+                  mr={0}
+                />
+              </Box>
+              <Avatar name={getClientName(membership.client_id)} size="md" bg="purple.500" mx={2} />
+              <Box minW={0} flex={1} flexShrink={1}>
+                <Text fontWeight="medium" color="gray.900" isTruncated>{membership.name}</Text>
+                <Text fontSize="sm" color="gray.500" isTruncated>
+                  {getClientName(membership.client_id)} • {getServiceName(membership.service_id)}
+                </Text>
+                <Flex gap={2} mt={2} wrap="wrap">
+                  <Badge
+                    px={3}
+                    py={1}
+                    borderRadius="full"
+                    fontSize="xs"
+                    bg={statusStyles[membership.status]?.bg || 'gray.100'}
+                    color={statusStyles[membership.status]?.color || 'gray.700'}
+                    fontWeight="semibold"
+                    whiteSpace="nowrap"
+                  >
+                    {membership.status}
                   </Badge>
-                  <Badge colorScheme={membership.paid ? 'green' : 'orange'}>
-                    {membership.paid ? 'PAID' : 'UNPAID'}
+                  <Badge
+                    px={3}
+                    py={1}
+                    borderRadius="full"
+                    fontSize="xs"
+                    colorScheme={membership.paid ? 'green' : 'orange'}
+                    fontWeight="semibold"
+                    whiteSpace="nowrap"
+                  >
+                    {membership.paid ? 'Paid' : 'Unpaid'}
                   </Badge>
                 </Flex>
-              </Flex>
-            ))
+              </Box>
+            </Flex>
+          ))}
+          {filteredMemberships.length === 0 && (
+            <Text color="gray.500" textAlign="center" py={8}>
+              {memberships.length === 0
+                ? 'No memberships found. Create your first membership to get started.'
+                : 'No memberships match your current filters. Try adjusting your search or filters.'
+              }
+            </Text>
           )}
-        </Box>
+        </ChakraStack>
       </Box>
-      {/* Filter Modal */}
-      <Modal isOpen={filterModalOpen} onClose={closeFilterModal} isCentered>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Filter Memberships</ModalHeader>
-          <ModalBody>
-            <Stack spacing={4}>
-              <FormControl>
-                <FormLabel>Status</FormLabel>
-                <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                  <option value="all">All</option>
-                  <option value="active">Active</option>
-                  <option value="expired">Expired</option>
-                  <option value="canceled">Canceled</option>
-                </Select>
-              </FormControl>
-              <FormControl>
-                <FormLabel>Payment</FormLabel>
-                <Select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)}>
-                  <option value="all">All</option>
-                  <option value="paid">Paid</option>
-                  <option value="unpaid">Unpaid</option>
-                </Select>
-              </FormControl>
-              <FormControl>
-                <FormLabel>Service</FormLabel>
-                <Select value={serviceFilter} onChange={e => setServiceFilter(e.target.value)}>
-                  <option value="all">All</option>
-                  {services.map(service => (
-                    <option key={service.id} value={service.id}>{service.name}</option>
-                  ))}
-                </Select>
-              </FormControl>
-            </Stack>
-          </ModalBody>
-          <ModalFooter>
-            <Button onClick={closeFilterModal} mr={2}>Close</Button>
-            <Button onClick={clearFilters} variant="ghost">Clear</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
       {/* MembershipViewModal */}
       {selectedMembership && (
         <MembershipViewModal
@@ -323,7 +408,7 @@ const Memberships: React.FC = () => {
           });
         }}
       />
-    </Box>
+    </ChakraStack>
   );
 };
 
