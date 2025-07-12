@@ -57,6 +57,65 @@ export interface StatsOverview {
   total_hours: number;
 }
 
+// Recurrence types
+export interface RecurrenceFrequency {
+  weekly: 'weekly';
+  biweekly: 'biweekly';
+  monthly: 'monthly';
+}
+
+export interface RecurrenceUpdateScope {
+  this_meeting_only: 'this_meeting_only';
+  this_and_future: 'this_and_future';
+  all_meetings: 'all_meetings';
+}
+
+export interface RecurrenceCreateRequest {
+  service_id: string;
+  client_id: string;
+  frequency: keyof RecurrenceFrequency;
+  start_date: string;
+  end_date: string;
+  title: string;
+  start_time: string; // HH:mm format
+  end_time: string; // HH:mm format
+  price_per_hour: number;
+}
+
+export interface RecurrenceResponse {
+  id: string;
+  user_id: string;
+  service_id: string;
+  client_id: string;
+  frequency: keyof RecurrenceFrequency;
+  start_date: string;
+  end_date: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  price_per_hour: number;
+  created_at: string;
+}
+
+export interface MeetingUpdateRequest {
+  service_id?: string;
+  client_id?: string;
+  title?: string;
+  start_time?: string;
+  end_time?: string;
+  price_per_hour?: number;
+  status?: 'upcoming' | 'done' | 'canceled';
+  paid?: boolean;
+  update_scope?: keyof RecurrenceUpdateScope;
+}
+
+export interface DailyBreakdownItem {
+  date: string; // YYYY-MM-DD (UTC)
+  revenue: number;
+  meetings_count: number;
+  meeting_ids: string[];
+}
+
 // API client with authentication
 class ApiClient {
   private baseUrl: string;
@@ -195,17 +254,10 @@ class ApiClient {
     });
   }
 
-  async updateMeeting(id: string, data: Partial<{
-    service_id: string;
-    client_id: string;
-    title: string;
-    recurrence_id: string;
-    start_time: string;
-    end_time: string;
-    price_per_hour: number;
-    status: 'upcoming' | 'done' | 'canceled';
-    paid: boolean;
-  }>): Promise<Meeting> {
+  async updateMeeting(
+    id: string,
+    data: MeetingUpdateRequest
+  ): Promise<Meeting> {
     return this.request<Meeting>(`/meetings/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -216,6 +268,34 @@ class ApiClient {
     await this.request(`/meetings/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // Recurrences API
+  async createRecurrence(recurrence: RecurrenceCreateRequest): Promise<RecurrenceResponse> {
+    return this.request<RecurrenceResponse>('/recurrences/', {
+      method: 'POST',
+      body: JSON.stringify(recurrence),
+    });
+  }
+
+  async updateRecurrence(
+    id: string,
+    data: Partial<RecurrenceCreateRequest>
+  ): Promise<RecurrenceResponse> {
+    return this.request<RecurrenceResponse>(`/recurrences/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteRecurrence(id: string): Promise<void> {
+    await this.request(`/recurrences/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getRecurringMeetings(recurrenceId: string): Promise<Meeting[]> {
+    return this.request<Meeting[]>(`/meetings/recurrence/${recurrenceId}`);
   }
 
   // Profile API
@@ -244,6 +324,15 @@ class ApiClient {
     if (endDate) params.append('end_date', endDate);
     if (serviceId) params.append('service_id', serviceId);
     return this.request<StatsOverview>(`/stats/overview?${params}`);
+  }
+
+  async getDailyBreakdown(startDate: string, endDate: string, serviceId?: string): Promise<DailyBreakdownItem[]> {
+    const params = new URLSearchParams({
+      start_date: startDate,
+      end_date: endDate,
+    });
+    if (serviceId) params.append('service_id', serviceId);
+    return this.request<DailyBreakdownItem[]>(`/stats/daily_breakdown?${params}`);
   }
 }
 

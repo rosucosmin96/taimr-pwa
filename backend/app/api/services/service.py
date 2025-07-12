@@ -1,85 +1,103 @@
-from datetime import datetime
 from uuid import UUID, uuid4
+
+from sqlalchemy import and_
+from sqlalchemy.orm import Session
 
 from app.api.services.model import (
     ServiceCreateRequest,
     ServiceResponse,
     ServiceUpdateRequest,
 )
+from app.models import Service as ServiceModel
 
 
 class ServiceService:
-    def __init__(self):
-        # Mock data
-        self.mock_services = [
-            ServiceResponse(
-                id=UUID("11111111-1111-1111-1111-111111111111"),
-                user_id=UUID("00000000-0000-0000-0000-000000000000"),
-                name="Web Development",
-                default_duration_minutes=120,
-                default_price_per_hour=75.0,
-                created_at=datetime(2024, 1, 15, 10, 0, 0),
-            ),
-            ServiceResponse(
-                id=UUID("22222222-2222-2222-2222-222222222222"),
-                user_id=UUID("00000000-0000-0000-0000-000000000000"),
-                name="Graphic Design",
-                default_duration_minutes=90,
-                default_price_per_hour=60.0,
-                created_at=datetime(2024, 1, 20, 14, 30, 0),
-            ),
-            ServiceResponse(
-                id=UUID("33333333-3333-3333-3333-333333333333"),
-                user_id=UUID("00000000-0000-0000-0000-000000000000"),
-                name="Consulting",
-                default_duration_minutes=60,
-                default_price_per_hour=100.0,
-                created_at=datetime(2024, 2, 1, 9, 0, 0),
-            ),
-        ]
+    def __init__(self, db: Session):
+        self.db = db
 
     async def get_services(self, user_id: UUID) -> list[ServiceResponse]:
         """Get all services for a user"""
-        return self.mock_services
+        services = (
+            self.db.query(ServiceModel)
+            .filter(ServiceModel.user_id == str(user_id))
+            .all()
+        )
+        return [self._to_response(service) for service in services]
 
     async def create_service(
         self, user_id: UUID, service: ServiceCreateRequest
     ) -> ServiceResponse:
         """Create a new service"""
-        new_service = ServiceResponse(
-            id=uuid4(),
-            user_id=user_id,
+        db_service = ServiceModel(
+            id=str(uuid4()),
+            user_id=str(user_id),
             name=service.name,
             default_duration_minutes=service.default_duration_minutes,
             default_price_per_hour=service.default_price_per_hour,
-            created_at=datetime.now(),
         )
-        self.mock_services.append(new_service)
-        return new_service
+
+        self.db.add(db_service)
+        self.db.commit()
+        self.db.refresh(db_service)
+
+        return self._to_response(db_service)
 
     async def update_service(
         self, user_id: UUID, service_id: UUID, service: ServiceUpdateRequest
     ) -> ServiceResponse:
         """Update an existing service"""
-        for _i, existing_service in enumerate(self.mock_services):
-            if existing_service.id == service_id:
-                if service.name is not None:
-                    existing_service.name = service.name
-                if service.default_duration_minutes is not None:
-                    existing_service.default_duration_minutes = (
-                        service.default_duration_minutes
-                    )
-                if service.default_price_per_hour is not None:
-                    existing_service.default_price_per_hour = (
-                        service.default_price_per_hour
-                    )
-                return existing_service
-        raise ValueError("Service not found")
+        db_service = (
+            self.db.query(ServiceModel)
+            .filter(
+                and_(
+                    ServiceModel.id == str(service_id),
+                    ServiceModel.user_id == str(user_id),
+                )
+            )
+            .first()
+        )
+
+        if not db_service:
+            raise ValueError("Service not found")
+
+        if service.name is not None:
+            db_service.name = service.name
+        if service.default_duration_minutes is not None:
+            db_service.default_duration_minutes = service.default_duration_minutes
+        if service.default_price_per_hour is not None:
+            db_service.default_price_per_hour = service.default_price_per_hour
+
+        self.db.commit()
+        self.db.refresh(db_service)
+
+        return self._to_response(db_service)
 
     async def delete_service(self, user_id: UUID, service_id: UUID) -> bool:
         """Delete a service"""
-        for i, service in enumerate(self.mock_services):
-            if service.id == service_id:
-                del self.mock_services[i]
-                return True
+        db_service = (
+            self.db.query(ServiceModel)
+            .filter(
+                and_(
+                    ServiceModel.id == str(service_id),
+                    ServiceModel.user_id == str(user_id),
+                )
+            )
+            .first()
+        )
+
+        if db_service:
+            self.db.delete(db_service)
+            self.db.commit()
+            return True
         return False
+
+    def _to_response(self, service: ServiceModel) -> ServiceResponse:
+        """Convert database model to response model"""
+        return ServiceResponse(
+            id=UUID(service.id),
+            user_id=UUID(service.user_id),
+            name=service.name,
+            default_duration_minutes=service.default_duration_minutes,
+            default_price_per_hour=service.default_price_per_hour,
+            created_at=service.created_at,
+        )

@@ -25,22 +25,26 @@ const Dashboard: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const today = new Date().toISOString().split('T')[0];
+        // Calculate UTC start and end of today
+        const now = new Date();
+        const startOfDayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+        const endOfDayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+        const todayStartUTC = startOfDayUTC.toISOString();
+        const todayEndUTC = endOfDayUTC.toISOString();
 
-        // Calculate week start and end dates
-        const todayDate = new Date();
-        const weekStart = new Date(todayDate);
-        weekStart.setDate(todayDate.getDate() - todayDate.getDay()); // Start of week (Sunday)
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6); // End of week (Saturday)
-
-        const weekStartStr = weekStart.toISOString().split('T')[0];
-        const weekEndStr = weekEnd.toISOString().split('T')[0];
+        // Calculate week start and end (UTC)
+        const weekStartUTCDate = new Date(startOfDayUTC);
+        weekStartUTCDate.setUTCDate(now.getUTCDate() - now.getUTCDay());
+        const weekEndUTCDate = new Date(weekStartUTCDate);
+        weekEndUTCDate.setUTCDate(weekStartUTCDate.getUTCDate() + 6);
+        weekEndUTCDate.setUTCHours(23, 59, 59, 999);
+        const weekStartUTC = weekStartUTCDate.toISOString();
+        const weekEndUTC = weekEndUTCDate.toISOString();
 
         const [todayStatsData, weekStatsData, meetingsData, profileData] = await Promise.all([
-          apiClient.getStatsOverview(today, today), // Today's stats
-          apiClient.getStatsOverview(weekStartStr, weekEndStr), // This week's stats
-          apiClient.getMeetings(undefined, today),
+          apiClient.getStatsOverview(todayStartUTC, todayEndUTC), // Today's stats
+          apiClient.getStatsOverview(weekStartUTC, weekEndUTC), // This week's stats
+          apiClient.getMeetings(undefined, now.toISOString().split('T')[0]),
           apiClient.getProfile()
         ]);
         setTodayStats(todayStatsData);

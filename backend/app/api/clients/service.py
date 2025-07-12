@@ -1,109 +1,118 @@
-from datetime import datetime
 from uuid import UUID, uuid4
+
+from sqlalchemy import and_
+from sqlalchemy.orm import Session
 
 from app.api.clients.model import (
     ClientCreateRequest,
     ClientResponse,
     ClientUpdateRequest,
 )
+from app.models import Client as ClientModel
 
 
 class ClientService:
-    def __init__(self):
-        # Mock data
-        self.mock_clients = [
-            ClientResponse(
-                id=UUID("44444444-4444-4444-4444-444444444444"),
-                user_id=UUID("00000000-0000-0000-0000-000000000000"),
-                service_id=UUID("11111111-1111-1111-1111-111111111111"),
-                name="John Smith",
-                email="john.smith@email.com",
-                phone="+1-555-0123",
-                custom_duration_minutes=120,
-                custom_price_per_hour=80.0,
-                created_at=datetime(2024, 1, 16, 11, 0, 0),
-            ),
-            ClientResponse(
-                id=UUID("55555555-5555-5555-5555-555555555555"),
-                user_id=UUID("00000000-0000-0000-0000-000000000000"),
-                service_id=UUID("22222222-2222-2222-2222-222222222222"),
-                name="Sarah Johnson",
-                email="sarah.j@company.com",
-                phone="+1-555-0456",
-                custom_duration_minutes=None,
-                custom_price_per_hour=None,
-                created_at=datetime(2024, 1, 22, 15, 30, 0),
-            ),
-            ClientResponse(
-                id=UUID("66666666-6666-6666-6666-666666666666"),
-                user_id=UUID("00000000-0000-0000-0000-000000000000"),
-                service_id=UUID("33333333-3333-3333-3333-333333333333"),
-                name="Mike Wilson",
-                email="mike.wilson@startup.io",
-                phone="+1-555-0789",
-                custom_duration_minutes=90,
-                custom_price_per_hour=110.0,
-                created_at=datetime(2024, 2, 5, 10, 0, 0),
-            ),
-        ]
+    def __init__(self, db: Session):
+        self.db = db
 
     async def get_clients(
         self, user_id: UUID, service_id: UUID | None = None
     ) -> list[ClientResponse]:
         """Get clients for a user, optionally filtered by service"""
+        query = self.db.query(ClientModel).filter(ClientModel.user_id == str(user_id))
+
         if service_id:
-            return [
-                client
-                for client in self.mock_clients
-                if client.service_id == service_id
-            ]
-        return self.mock_clients
+            query = query.filter(ClientModel.service_id == str(service_id))
+
+        clients = query.all()
+        return [self._to_response(client) for client in clients]
 
     async def create_client(
         self, user_id: UUID, client: ClientCreateRequest
     ) -> ClientResponse:
         """Create a new client"""
-        new_client = ClientResponse(
-            id=uuid4(),
-            user_id=user_id,
-            service_id=client.service_id,
+        db_client = ClientModel(
+            id=str(uuid4()),
+            user_id=str(user_id),
+            service_id=str(client.service_id),
             name=client.name,
             email=client.email,
             phone=client.phone,
             custom_duration_minutes=client.custom_duration_minutes,
             custom_price_per_hour=client.custom_price_per_hour,
-            created_at=datetime.now(),
         )
-        self.mock_clients.append(new_client)
-        return new_client
+
+        self.db.add(db_client)
+        self.db.commit()
+        self.db.refresh(db_client)
+
+        return self._to_response(db_client)
 
     async def update_client(
         self, user_id: UUID, client_id: UUID, client: ClientUpdateRequest
     ) -> ClientResponse:
         """Update an existing client"""
-        for existing_client in self.mock_clients:
-            if existing_client.id == client_id:
-                if client.service_id is not None:
-                    existing_client.service_id = client.service_id
-                if client.name is not None:
-                    existing_client.name = client.name
-                if client.email is not None:
-                    existing_client.email = client.email
-                if client.phone is not None:
-                    existing_client.phone = client.phone
-                if client.custom_duration_minutes is not None:
-                    existing_client.custom_duration_minutes = (
-                        client.custom_duration_minutes
-                    )
-                if client.custom_price_per_hour is not None:
-                    existing_client.custom_price_per_hour = client.custom_price_per_hour
-                return existing_client
-        raise ValueError("Client not found")
+        db_client = (
+            self.db.query(ClientModel)
+            .filter(
+                and_(
+                    ClientModel.id == str(client_id),
+                    ClientModel.user_id == str(user_id),
+                )
+            )
+            .first()
+        )
+
+        if not db_client:
+            raise ValueError("Client not found")
+
+        if client.service_id is not None:
+            db_client.service_id = str(client.service_id)
+        if client.name is not None:
+            db_client.name = client.name
+        if client.email is not None:
+            db_client.email = client.email
+        if client.phone is not None:
+            db_client.phone = client.phone
+        if client.custom_duration_minutes is not None:
+            db_client.custom_duration_minutes = client.custom_duration_minutes
+        if client.custom_price_per_hour is not None:
+            db_client.custom_price_per_hour = client.custom_price_per_hour
+
+        self.db.commit()
+        self.db.refresh(db_client)
+
+        return self._to_response(db_client)
 
     async def delete_client(self, user_id: UUID, client_id: UUID) -> bool:
         """Delete a client"""
-        for i, client in enumerate(self.mock_clients):
-            if client.id == client_id:
-                del self.mock_clients[i]
-                return True
+        db_client = (
+            self.db.query(ClientModel)
+            .filter(
+                and_(
+                    ClientModel.id == str(client_id),
+                    ClientModel.user_id == str(user_id),
+                )
+            )
+            .first()
+        )
+
+        if db_client:
+            self.db.delete(db_client)
+            self.db.commit()
+            return True
         return False
+
+    def _to_response(self, client: ClientModel) -> ClientResponse:
+        """Convert database model to response model"""
+        return ClientResponse(
+            id=UUID(client.id),
+            user_id=UUID(client.user_id),
+            service_id=UUID(client.service_id),
+            name=client.name,
+            email=client.email,
+            phone=client.phone,
+            custom_duration_minutes=client.custom_duration_minutes,
+            custom_price_per_hour=client.custom_price_per_hour,
+            created_at=client.created_at,
+        )

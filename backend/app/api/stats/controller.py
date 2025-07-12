@@ -1,36 +1,67 @@
-from datetime import date
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
 from app.api.auth import get_current_user_id
-from app.api.stats.model import ClientStatsResponse, StatsOverview
+from app.api.stats.model import ClientStatsResponse, DailyBreakdownItem, StatsOverview
 from app.api.stats.service import StatsService
+from app.database import get_db
 
 router = APIRouter()
-stats_service = StatsService()
 
 
 @router.get("/overview", response_model=StatsOverview)
 async def get_stats_overview(
-    start_date: date | None = Query(
-        None, description="Start date for custom period (inclusive)"
+    start_date: datetime | None = Query(
+        None, description="Start datetime (UTC, ISO 8601) for custom period (inclusive)"
     ),
-    end_date: date | None = Query(
-        None, description="End date for custom period (inclusive)"
+    end_date: datetime | None = Query(
+        None, description="End datetime (UTC, ISO 8601) for custom period (inclusive)"
     ),
     service_id: UUID | None = Query(None),
     user_id: UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
 ):
     """Get overview statistics for the current user.
-    If no dates provided, returns all-time stats.
-    If dates provided, returns stats for the specified period."""
-    return await stats_service.get_overview(user_id, start_date, end_date, service_id)
+    If no datetimes provided, returns all-time stats.
+    If datetimes provided, returns stats for the specified period."""
+    service = StatsService(db)
+    return await service.get_overview(user_id, start_date, end_date, service_id)
 
 
-@router.get("/client/{client_id}", response_model=ClientStatsResponse)
+@router.get("/clients", response_model=list[ClientStatsResponse])
 async def get_client_stats(
-    client_id: UUID, user_id: UUID = Depends(get_current_user_id)
+    start_date: datetime | None = Query(
+        None, description="Start datetime (UTC, ISO 8601) for custom period (inclusive)"
+    ),
+    end_date: datetime | None = Query(
+        None, description="End datetime (UTC, ISO 8601) for custom period (inclusive)"
+    ),
+    service_id: UUID | None = Query(None),
+    user_id: UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
 ):
-    """Get detailed statistics for a specific client"""
-    return await stats_service.get_client_stats(user_id, client_id)
+    """Get client statistics for the current user.
+    If no datetimes provided, returns all-time stats.
+    If datetimes provided, returns stats for the specified period."""
+    service = StatsService(db)
+    return await service.get_client_stats(user_id, start_date, end_date, service_id)
+
+
+@router.get("/daily_breakdown", response_model=list[DailyBreakdownItem])
+async def get_daily_breakdown(
+    start_date: datetime = Query(
+        ..., description="Start datetime (UTC, ISO 8601) for period (inclusive)"
+    ),
+    end_date: datetime = Query(
+        ..., description="End datetime (UTC, ISO 8601) for period (inclusive)"
+    ),
+    service_id: UUID | None = Query(None),
+    user_id: UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Get daily breakdown of revenue and meetings for the current user (UTC, excludes canceled)."""
+    service = StatsService(db)
+    return await service.get_daily_breakdown(user_id, start_date, end_date, service_id)

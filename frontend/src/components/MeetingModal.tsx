@@ -17,6 +17,10 @@ import {
   Spinner,
   Stack,
   Flex,
+  Divider,
+  Text,
+  VStack,
+  HStack,
 } from '@chakra-ui/react';
 import { apiClient, Service, Client } from '../lib/api';
 
@@ -43,6 +47,11 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
   const [pricePerMeeting, setPricePerMeeting] = useState('');
   const [status, setStatus] = useState<'upcoming' | 'done' | 'canceled'>('upcoming');
   const [paid, setPaid] = useState(false);
+
+  // Recurrence state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
 
   // For duration logic
   const [serviceDuration, setServiceDuration] = useState<number | null>(null);
@@ -178,6 +187,11 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
     setPricePerHour((clientPrice || servicePrice || 0).toString());
     setStatus('upcoming');
     setPaid(false);
+
+    // Reset recurrence settings
+    setIsRecurring(false);
+    setRecurrenceFrequency('weekly');
+    setRecurrenceEndDate('');
   }, [isOpen, clientDuration, serviceDuration, clientPrice, servicePrice]);
 
   // Update end time and price when client/service/startTime changes
@@ -195,19 +209,45 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!serviceId || !clientId || !title || !startTime || !endTime || !pricePerHour) return;
+
     setSubmitting(true);
     try {
-      await apiClient.createMeeting({
-        service_id: serviceId,
-        client_id: clientId,
-        title,
-        start_time: new Date(startTime).toISOString(),
-        end_time: new Date(endTime).toISOString(),
-        price_per_hour: parseFloat(pricePerHour),
-        status,
-        paid,
-      });
-      toast({ title: 'Meeting created', status: 'success', duration: 2000, isClosable: true });
+      if (isRecurring && recurrenceEndDate) {
+        // Create recurrence
+        const startDate = new Date(startTime);
+        // Convert end date to datetime by combining with the start time
+        const endDate = new Date(recurrenceEndDate + 'T' + startDate.toTimeString().slice(0, 5));
+
+        // Extract time components
+        const startTimeOnly = startDate.toTimeString().slice(0, 5); // HH:mm
+        const endTimeOnly = new Date(endTime).toTimeString().slice(0, 5); // HH:mm
+
+        await apiClient.createRecurrence({
+          service_id: serviceId,
+          client_id: clientId,
+          frequency: recurrenceFrequency,
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          title,
+          start_time: startTimeOnly,
+          end_time: endTimeOnly,
+          price_per_hour: parseFloat(pricePerHour),
+        });
+        toast({ title: 'Recurring meeting created', status: 'success', duration: 2000, isClosable: true });
+      } else {
+        // Create single meeting
+        await apiClient.createMeeting({
+          service_id: serviceId,
+          client_id: clientId,
+          title,
+          start_time: new Date(startTime).toISOString(),
+          end_time: new Date(endTime).toISOString(),
+          price_per_hour: parseFloat(pricePerHour),
+          status,
+          paid,
+        });
+        toast({ title: 'Meeting created', status: 'success', duration: 2000, isClosable: true });
+      }
       onSuccess();
       onClose();
     } catch (err) {
@@ -281,16 +321,69 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
                     step={0.01}
                   />
                 </FormControl>
-                <FormControl isRequired>
+
+                <Divider />
+
+                <FormControl>
+                  <Checkbox isChecked={isRecurring} onChange={e => setIsRecurring(e.target.checked)}>
+                    Make this a recurring meeting
+                  </Checkbox>
+                </FormControl>
+
+                {isRecurring && (
+                  <VStack spacing={4} align="start">
+                    <FormControl isRequired={isRecurring}>
+                      <FormLabel>Frequency</FormLabel>
+                      <Select value={recurrenceFrequency} onChange={e => setRecurrenceFrequency(e.target.value as any)}>
+                        <option value="weekly">Weekly</option>
+                        <option value="biweekly">Bi-weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </Select>
+                    </FormControl>
+
+                    <FormControl isRequired={isRecurring}>
+                      <FormLabel>End Date</FormLabel>
+                      <Input
+                        type="date"
+                        value={recurrenceEndDate}
+                        onChange={e => setRecurrenceEndDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                      />
+                    </FormControl>
+                  </VStack>
+                )}
+
+                <FormControl isRequired={!isRecurring}>
                   <FormLabel>Status</FormLabel>
-                  <Select value={status} onChange={e => setStatus(e.target.value as any)}>
+                  <Select
+                    value={status}
+                    onChange={e => setStatus(e.target.value as any)}
+                    isDisabled={isRecurring}
+                  >
                     <option value="upcoming">Upcoming</option>
                     <option value="done">Done</option>
                     <option value="canceled">Canceled</option>
                   </Select>
+                  {isRecurring && (
+                    <Text fontSize="sm" color="gray.600" mt={1}>
+                      Recurring meetings are automatically set to "Upcoming"
+                    </Text>
+                  )}
                 </FormControl>
+
                 <FormControl>
-                  <Checkbox isChecked={paid} onChange={e => setPaid(e.target.checked)}>Paid</Checkbox>
+                  <Checkbox
+                    isChecked={paid}
+                    onChange={e => setPaid(e.target.checked)}
+                    isDisabled={isRecurring}
+                  >
+                    Paid
+                  </Checkbox>
+                  {isRecurring && (
+                    <Text fontSize="sm" color="gray.600" mt={1}>
+                      Recurring meetings are automatically set to "Unpaid"
+                    </Text>
+                  )}
                 </FormControl>
               </Stack>
             )}
