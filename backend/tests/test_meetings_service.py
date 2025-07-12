@@ -78,7 +78,7 @@ class TestMeetingService:
             start_time=datetime.now(),
             end_time=datetime.now() + timedelta(hours=1),
             price_per_hour=100.0,
-            status=MeetingStatus.upcoming,
+            status=MeetingStatus.UPCOMING,
             paid=False,
         )
 
@@ -89,7 +89,7 @@ class TestMeetingService:
         assert result.client_id == UUID(test_client.id)
         assert result.title == "Test Meeting"
         assert result.price_total == 100.0
-        assert result.status == MeetingStatus.upcoming
+        assert result.status == MeetingStatus.UPCOMING
         assert result.paid is False
 
     async def test_get_meetings(
@@ -104,7 +104,7 @@ class TestMeetingService:
             start_time=datetime.now(),
             end_time=datetime.now() + timedelta(hours=1),
             price_per_hour=100.0,
-            status=MeetingStatus.upcoming,
+            status=MeetingStatus.UPCOMING,
             paid=False,
         )
 
@@ -121,7 +121,7 @@ class TestMeetingService:
     ):
         """Test getting meetings filtered by status."""
         # Create meetings with different statuses
-        for status in [MeetingStatus.upcoming, MeetingStatus.done]:
+        for status in [MeetingStatus.UPCOMING, MeetingStatus.DONE]:
             meeting_data = MeetingCreateRequest(
                 service_id=UUID(test_service.id),
                 client_id=UUID(test_client.id),
@@ -136,11 +136,11 @@ class TestMeetingService:
 
         # Get only upcoming meetings
         upcoming_meetings = await meeting_service.get_meetings(
-            UUID(test_user.id), status=MeetingStatus.upcoming
+            UUID(test_user.id), status=MeetingStatus.UPCOMING
         )
 
         assert len(upcoming_meetings) == 1
-        assert upcoming_meetings[0].status == MeetingStatus.upcoming
+        assert upcoming_meetings[0].status == MeetingStatus.UPCOMING
 
     async def test_get_meetings_with_date_filter(
         self, meeting_service, test_user, test_service, test_client
@@ -162,7 +162,7 @@ class TestMeetingService:
                     meeting_date, datetime.min.time().replace(hour=10)
                 ),
                 price_per_hour=100.0,
-                status=MeetingStatus.upcoming,
+                status=MeetingStatus.UPCOMING,
                 paid=False,
             )
             await meeting_service.create_meeting(UUID(test_user.id), meeting_data)
@@ -187,7 +187,7 @@ class TestMeetingService:
             start_time=datetime.now(),
             end_time=datetime.now() + timedelta(hours=1),
             price_per_hour=100.0,
-            status=MeetingStatus.upcoming,
+            status=MeetingStatus.UPCOMING,
             paid=False,
         )
 
@@ -197,7 +197,7 @@ class TestMeetingService:
 
         # Update the meeting
         update_data = MeetingUpdateRequest(
-            title="Updated Title", status=MeetingStatus.done, paid=True
+            title="Updated Title", status=MeetingStatus.DONE, paid=True
         )
 
         updated_meeting = await meeting_service.update_meeting(
@@ -205,7 +205,7 @@ class TestMeetingService:
         )
 
         assert updated_meeting.title == "Updated Title"
-        assert updated_meeting.status == MeetingStatus.done
+        assert updated_meeting.status == MeetingStatus.DONE
         assert updated_meeting.paid is True
 
     async def test_delete_meeting(
@@ -220,7 +220,7 @@ class TestMeetingService:
             start_time=datetime.now(),
             end_time=datetime.now() + timedelta(hours=1),
             price_per_hour=100.0,
-            status=MeetingStatus.upcoming,
+            status=MeetingStatus.UPCOMING,
             paid=False,
         )
 
@@ -255,7 +255,7 @@ class TestMeetingService:
                 start_time=datetime.now() + timedelta(days=i),
                 end_time=datetime.now() + timedelta(days=i, hours=1),
                 price_per_hour=100.0,
-                status=MeetingStatus.upcoming,
+                status=MeetingStatus.UPCOMING,
                 paid=False,
             )
             await meeting_service.create_meeting(UUID(test_user.id), meeting_data)

@@ -51,7 +51,7 @@ class RecurrenceService:
                 start_time=start_datetime,
                 end_time=end_datetime,
                 price_per_hour=recurrence.price_per_hour,
-                status=MeetingStatus.upcoming,
+                status=MeetingStatus.UPCOMING,
                 paid=False,
             )
             instances.append(instance)
