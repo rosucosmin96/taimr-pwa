@@ -11,6 +11,13 @@ class StatsOverview(BaseModel):
     total_clients: int
     total_revenue: float
     total_hours: float
+    # Membership stats
+    total_memberships: int
+    active_memberships: int
+    membership_revenue: float
+    membership_revenue_paid: float
+    clients_with_memberships: int
+    revenue_paid: float  # sum of price_total for meetings that are done and paid
 
 
 class ClientStats(BaseModel):

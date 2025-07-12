@@ -11,6 +11,7 @@ from app.api.stats.model import (
 )
 from app.models import Client as ClientModel
 from app.models import Meeting as MeetingModel
+from app.models import Membership as MembershipModel
 from app.models.meeting import MeetingStatus
 
 
@@ -54,6 +55,32 @@ class StatsService:
             for m in meetings
             if m.status == MeetingStatus.DONE.value
         )
+
+        # Revenue paid: sum of price_total for meetings that are done and paid
+        revenue_paid = sum(
+            float(m.price_total)
+            for m in meetings
+            if m.status == MeetingStatus.DONE.value and m.paid
+        )
+
+        # Membership statistics
+        membership_query = self.db.query(MembershipModel).filter(
+            MembershipModel.user_id == str(user_id)
+        )
+        if service_id:
+            membership_query = membership_query.filter(
+                MembershipModel.service_id == str(service_id)
+            )
+        memberships = membership_query.all()
+
+        total_memberships = len(memberships)
+        active_memberships = len([m for m in memberships if m.status == "active"])
+        membership_revenue = sum(float(m.price_per_membership) for m in memberships)
+        membership_revenue_paid = sum(
+            float(m.price_per_membership) for m in memberships if m.paid
+        )
+        clients_with_memberships = len({m.client_id for m in memberships})
+
         return StatsOverview(
             total_meetings=total_meetings,
             done_meetings=done_meetings,
@@ -61,6 +88,12 @@ class StatsService:
             total_clients=total_clients,
             total_revenue=total_revenue,
             total_hours=total_hours,
+            total_memberships=total_memberships,
+            active_memberships=active_memberships,
+            membership_revenue=membership_revenue,
+            membership_revenue_paid=membership_revenue_paid,
+            clients_with_memberships=clients_with_memberships,
+            revenue_paid=revenue_paid,
         )
 
     async def get_client_stats(

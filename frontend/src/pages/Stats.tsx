@@ -68,19 +68,19 @@ const ResponsiveContentWrapper: React.FC<{ children: (maxWidth: number) => React
 
 const useKpiGridLayout = () => {
   const isSidebarActive = useBreakpointValue({ base: false, md: true });
-  const [isThreeByTwo, setIsThreeByTwo] = useState(false);
+  const [isTwoByFour, setIsTwoByFour] = useState(false);
   useEffect(() => {
     function handleResize() {
       const sidebar = isSidebarActive ? SIDEBAR_WIDTH : 0;
       const safe = SAFE_MARGIN;
-      const gridMinWidth = 3 * MIN_CELL_WIDTH;
-      setIsThreeByTwo(window.innerWidth < sidebar + gridMinWidth + safe);
+      const gridMinWidth = 4 * MIN_CELL_WIDTH; // 4 columns
+      setIsTwoByFour(window.innerWidth < sidebar + gridMinWidth + safe);
     }
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [isSidebarActive]);
-  return isThreeByTwo;
+  return isTwoByFour;
 };
 
 const Stats: React.FC = () => {
@@ -104,7 +104,7 @@ const Stats: React.FC = () => {
   const isTablet = useBreakpointValue({ base: false, md: true, lg: false });
   const isDesktop = useBreakpointValue({ base: false, lg: true });
 
-  const isThreeByTwo = useKpiGridLayout();
+  const isTwoByFour = useKpiGridLayout();
 
   // Fetch services on component mount
   useEffect(() => {
@@ -391,24 +391,47 @@ const Stats: React.FC = () => {
       color: 'yellow.100'
     },
     {
-      title: 'Average Price per Meeting',
-      value: `$${stats && stats.total_meetings > 0 ? (stats.total_revenue / stats.total_meetings).toFixed(2) : '0.00'}`,
+      title: 'Revenue Paid',
+      value: `$${stats?.revenue_paid?.toFixed(2) || '0.00'}`,
       icon: <CurrencyDollarIcon style={{ width: 28, height: 28 }} color="#38A169" />,
       color: 'green.100'
     },
     {
-      title: 'Average Price per Hour',
+      title: 'Clients with Memberships',
+      value: stats?.clients_with_memberships || 0,
+      icon: <UserGroupIcon style={{ width: 28, height: 28 }} color="#3182CE" />,
+      color: 'blue.100'
+    },
+    // New KPI: Price per Meeting
+    {
+      title: 'Price per Meeting',
+      value: `$${stats && stats.total_meetings > 0 ? (stats.total_revenue / stats.total_meetings).toFixed(2) : '0.00'}`,
+      icon: <CurrencyDollarIcon style={{ width: 28, height: 28 }} color="#38A169" />,
+      color: 'green.100'
+    },
+    // New KPI: Price per Hour
+    {
+      title: 'Price per Hour',
       value: `$${stats && stats.total_hours > 0 ? (stats.total_revenue / stats.total_hours).toFixed(2) : '0.00'}`,
       icon: <ClockIcon style={{ width: 28, height: 28 }} color="#3182CE" />,
       color: 'blue.100'
     }
   ];
 
+  // Adjust grid layout for 8 cards
+  const kpiGridColumns = { base: 1, sm: 2, md: 3, lg: 4, xl: 4, '2xl': 4 };
+
   // Meeting status data for pie chart
   const meetingStatusData = [
     { name: 'Done', value: stats?.done_meetings || 0, color: '#38A169' },
     { name: 'Canceled', value: stats?.canceled_meetings || 0, color: '#E53E3E' },
     { name: 'Upcoming', value: (stats?.total_meetings || 0) - (stats?.done_meetings || 0) - (stats?.canceled_meetings || 0), color: '#3182CE' },
+  ];
+
+  // Membership status data for pie chart
+  const membershipStatusData = [
+    { name: 'Active', value: stats?.active_memberships || 0, color: '#38A169' },
+    { name: 'Expired', value: (stats?.total_memberships || 0) - (stats?.active_memberships || 0), color: '#E53E3E' },
   ];
 
   // Weekly revenue data (from API)
@@ -571,8 +594,8 @@ const Stats: React.FC = () => {
 
           {/* KPI Cards */}
           <Grid
-            templateColumns={isThreeByTwo ? '1fr 1fr' : '1fr 1fr 1fr'}
-            templateRows={isThreeByTwo ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)'}
+            templateColumns={isTwoByFour ? '1fr 1fr' : '1fr 1fr 1fr 1fr'}
+            templateRows={isTwoByFour ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)'}
             gap={4}
             w="full"
           >
@@ -728,6 +751,32 @@ const Stats: React.FC = () => {
                 </ResponsiveContainer>
               </Box>
             </Box>
+
+            {/* Membership Status Distribution */}
+            {stats?.total_memberships && stats.total_memberships > 0 && (
+              <Box bg="white" rounded="xl" shadow="md" p={{ base: 3, md: 6 }} w="full" maxW="100%">
+                <Text fontWeight="semibold" fontSize={{ base: "sm", md: "lg" }} mb={3}>Membership Status</Text>
+                <Box h={{ base: "40", md: "64" }} w="full" maxW="100%">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={membershipStatusData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={isMobile ? 50 : 80}
+                        dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}`}
+                      >
+                        {membershipStatusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Box>
+              </Box>
+            )}
           </VStack>
 
           {/* Period Comparison Panel - Histogram */}
@@ -778,6 +827,61 @@ const Stats: React.FC = () => {
                     >
                       {calculatePercentageChange(stats?.total_revenue || 0, previousStats?.total_revenue || 0) >= 0 ? '+' : ''}
                       {calculatePercentageChange(stats?.total_revenue || 0, previousStats?.total_revenue || 0).toFixed(1)}%
+                    </Text>
+                  </Box>
+                </SimpleGrid>
+              </VStack>
+            </Box>
+          )}
+
+          {/* Membership Revenue Comparison */}
+          {stats?.total_memberships && stats.total_memberships > 0 && (
+            <Box bg="white" rounded="xl" shadow="md" p={{ base: 3, md: 6 }} w="full" maxW={maxWidth} minW={0}>
+              <Text fontWeight="semibold" fontSize={{ base: "sm", md: "lg" }} mb={3}>Membership Revenue Breakdown</Text>
+              <Box h={{ base: "40", md: "64" }} w="full" maxW="100%">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[
+                    {
+                      name: 'Total Revenue',
+                      revenue: stats?.membership_revenue || 0,
+                      fill: '#38A169'
+                    },
+                    {
+                      name: 'Revenue Paid',
+                      revenue: stats?.membership_revenue_paid || 0,
+                      fill: '#3182CE'
+                    },
+                    {
+                      name: 'Revenue Outstanding',
+                      revenue: (stats?.membership_revenue || 0) - (stats?.membership_revenue_paid || 0),
+                      fill: '#E53E3E'
+                    }
+                  ]}>
+                    <XAxis dataKey="name" fontSize={isMobile ? 8 : 12} />
+                    <YAxis fontSize={isMobile ? 8 : 12} />
+                    <Tooltip formatter={(value) => [`$${value}`, 'Revenue']} />
+                    <Bar dataKey="revenue" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+              <VStack spacing={{ base: 3, md: 4 }} mt={4} w="full">
+                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{ base: 3, md: 4 }} w="full">
+                  <Box textAlign="center">
+                    <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Revenue</Text>
+                    <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="green.600">
+                      ${stats?.membership_revenue.toFixed(2) || '0.00'}
+                    </Text>
+                  </Box>
+                  <Box textAlign="center">
+                    <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Revenue Paid</Text>
+                    <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="blue.600">
+                      ${stats?.membership_revenue_paid.toFixed(2) || '0.00'}
+                    </Text>
+                  </Box>
+                  <Box textAlign="center">
+                    <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Outstanding</Text>
+                    <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="red.600">
+                      ${((stats?.membership_revenue || 0) - (stats?.membership_revenue_paid || 0)).toFixed(2)}
                     </Text>
                   </Box>
                 </SimpleGrid>

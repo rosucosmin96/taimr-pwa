@@ -110,6 +110,15 @@ class MembershipService:
             db_membership.status = membership.status.value
         if membership.paid is not None:
             db_membership.paid = membership.paid
+            # If paid is set to True, set all meetings for this membership to paid
+            if membership.paid:
+                meetings = (
+                    self.db.query(MeetingModel)
+                    .filter(MeetingModel.membership_id == db_membership.id)
+                    .all()
+                )
+                for meeting in meetings:
+                    meeting.paid = True
 
         self.db.commit()
         self.db.refresh(db_membership)

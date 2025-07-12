@@ -56,6 +56,13 @@ export interface StatsOverview {
   total_clients: number;
   total_revenue: number;
   total_hours: number;
+  // Membership stats
+  total_memberships: number;
+  active_memberships: number;
+  membership_revenue: number;
+  membership_revenue_paid: number;
+  clients_with_memberships: number;
+  revenue_paid: number; // NEW: sum of price_total for meetings that are done and paid
 }
 
 // Recurrence types
