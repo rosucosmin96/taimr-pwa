@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.clients import router as clients_router
 from app.api.meetings import router as meetings_router
+from app.api.memberships import router as memberships_router
 from app.api.profile import router as profile_router
 from app.api.recurrences import router as recurrences_router
 from app.api.services import router as services_router
@@ -49,6 +50,7 @@ app.add_middleware(
 app.include_router(services_router, prefix="/services", tags=["services"])
 app.include_router(clients_router, prefix="/clients", tags=["clients"])
 app.include_router(meetings_router, prefix="/meetings", tags=["meetings"])
+app.include_router(memberships_router, prefix="/memberships", tags=["memberships"])
 app.include_router(profile_router, prefix="/profile", tags=["profile"])
 app.include_router(stats_router, prefix="/stats", tags=["stats"])
 app.include_router(recurrences_router, prefix="/recurrences", tags=["recurrences"])

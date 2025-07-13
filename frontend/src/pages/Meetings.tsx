@@ -28,7 +28,7 @@ import {
   useToast,
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, FormControl, FormLabel
 } from '@chakra-ui/react';
-import { apiClient, Meeting, Client, Service } from '../lib/api';
+import { apiClient, Meeting, Client, Service, Membership } from '../lib/api';
 import MeetingModal from '../components/MeetingModal';
 import MeetingViewModal from '../components/MeetingViewModal';
 
@@ -45,6 +45,7 @@ const Meetings: React.FC = () => {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -116,14 +117,16 @@ const Meetings: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [meetingsData, clientsData, servicesData] = await Promise.all([
+      const [meetingsData, clientsData, servicesData, membershipsData] = await Promise.all([
         apiClient.getMeetings(),
         apiClient.getClients(),
-        apiClient.getServices()
+        apiClient.getServices(),
+        apiClient.getMemberships()
       ]);
       setMeetings(meetingsData);
       setClients(clientsData);
       setServices(servicesData);
+      setMemberships(membershipsData);
     } catch (err) {
       setError('Failed to load meetings');
       console.error('Meetings fetch error:', err);
@@ -151,6 +154,11 @@ const Meetings: React.FC = () => {
     const service = services.find(s => s.id === serviceId);
     return service?.name || 'Unknown Service';
   }, [services]);
+
+  const getMembershipName = useCallback((membershipId: string) => {
+    const membership = memberships.find(m => m.id === membershipId);
+    return membership?.name || '';
+  }, [memberships]);
 
   // Filter meetings based on current filters
   const filteredMeetings = useMemo(() => {
@@ -503,6 +511,11 @@ const Meetings: React.FC = () => {
                   <Text fontSize="sm" color="gray.600" mt={1}>
                     ${meeting.price_total.toFixed(2)} • {meeting.paid ? 'Paid' : 'Unpaid'}
                   </Text>
+                  {meeting.membership_id && (
+                    <Badge colorScheme="purple" size="sm" mt={1}>
+                      {getMembershipName(meeting.membership_id)}
+                    </Badge>
+                  )}
                 </Box>
               </HStack>
               <Badge px={3} py={1} borderRadius="full" fontSize="xs" bg={statusStyles[meeting.status].bg} color={statusStyles[meeting.status].color} display="flex" alignItems="center">

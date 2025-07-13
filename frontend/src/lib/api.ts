@@ -31,6 +31,7 @@ export interface Meeting {
   client_id: string;
   title?: string;
   recurrence_id?: string;
+  membership_id?: string;
   start_time: string;
   end_time: string;
   price_per_hour: number;
@@ -55,6 +56,13 @@ export interface StatsOverview {
   total_clients: number;
   total_revenue: number;
   total_hours: number;
+  // Membership stats
+  total_memberships: number;
+  active_memberships: number;
+  membership_revenue: number;
+  membership_revenue_paid: number;
+  clients_with_memberships: number;
+  revenue_paid: number; // NEW: sum of price_total for meetings that are done and paid
 }
 
 // Recurrence types
@@ -114,6 +122,59 @@ export interface DailyBreakdownItem {
   revenue: number;
   meetings_count: number;
   meeting_ids: string[];
+}
+
+// Membership types
+export interface Membership {
+  id: string;
+  user_id: string;
+  service_id: string;
+  client_id: string;
+  name: string;
+  total_meetings: number;
+  price_per_membership: number;
+  price_per_meeting: number;
+  availability_days: number;
+  status: 'active' | 'expired' | 'canceled';
+  paid: boolean;
+  start_date?: string;
+  created_at: string;
+}
+
+export interface MembershipCreateRequest {
+  service_id: string;
+  client_id: string;
+  name: string;
+  total_meetings: number;
+  price_per_membership: number;
+  availability_days: number;
+}
+
+export interface MembershipUpdateRequest {
+  name?: string;
+  total_meetings?: number;
+  price_per_membership?: number;
+  availability_days?: number;
+  status?: 'active' | 'expired' | 'canceled';
+  paid?: boolean;
+}
+
+export interface ClientStats {
+  client_id: string;
+  client_name: string;
+  total_meetings: number;
+  done_meetings: number;
+  canceled_meetings: number;
+  total_revenue: number;
+  total_hours: number;
+  last_meeting?: string | null;
+  price_per_hour?: number;
+  price_per_meeting?: number;
+}
+
+export interface ClientStatsResponse {
+  client_stats: ClientStats;
+  meetings: Meeting[];
 }
 
 // API client with authentication
@@ -242,6 +303,7 @@ class ApiClient {
     client_id: string;
     title?: string;
     recurrence_id?: string;
+    membership_id?: string;
     start_time: string;
     end_time: string;
     price_per_hour: number;
@@ -326,6 +388,18 @@ class ApiClient {
     return this.request<StatsOverview>(`/stats/overview?${params}`);
   }
 
+  async getClientStats(
+    startDate?: string,
+    endDate?: string,
+    serviceId?: string
+  ): Promise<ClientStatsResponse[]> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    if (serviceId) params.append('service_id', serviceId);
+    return this.request<ClientStatsResponse[]>(`/stats/clients?${params}`);
+  }
+
   async getDailyBreakdown(startDate: string, endDate: string, serviceId?: string): Promise<DailyBreakdownItem[]> {
     const params = new URLSearchParams({
       start_date: startDate,
@@ -333,6 +407,52 @@ class ApiClient {
     });
     if (serviceId) params.append('service_id', serviceId);
     return this.request<DailyBreakdownItem[]>(`/stats/daily_breakdown?${params}`);
+  }
+
+  async getSingleClientStats(
+    clientId: string,
+    startDate?: string,
+    endDate?: string,
+    serviceId?: string
+  ): Promise<ClientStatsResponse> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    if (serviceId) params.append('service_id', serviceId);
+    return this.request<ClientStatsResponse>(`/stats/clients/${clientId}?${params}`);
+  }
+
+  // Memberships API
+  async getMemberships(): Promise<Membership[]> {
+    return this.request<Membership[]>('/memberships/');
+  }
+
+  async createMembership(data: MembershipCreateRequest): Promise<Membership> {
+    return this.request<Membership>('/memberships/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateMembership(id: string, data: MembershipUpdateRequest): Promise<Membership> {
+    return this.request<Membership>(`/memberships/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMembership(id: string): Promise<void> {
+    await this.request(`/memberships/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getActiveMembership(clientId: string): Promise<Membership | null> {
+    return this.request<Membership | null>(`/memberships/active/${clientId}`);
+  }
+
+  async getMembershipMeetings(membershipId: string): Promise<Meeting[]> {
+    return this.request<Meeting[]>(`/memberships/${membershipId}/meetings`);
   }
 }
 

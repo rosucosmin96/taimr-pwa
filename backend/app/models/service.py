@@ -33,6 +33,9 @@ class Service(Base, TimestampMixin):
     recurrences = relationship(
         "Recurrence", back_populates="service", cascade="all, delete-orphan"
     )
+    memberships = relationship(
+        "Membership", back_populates="service", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Service(id={self.id}, name={self.name}, user_id={self.user_id})>"
