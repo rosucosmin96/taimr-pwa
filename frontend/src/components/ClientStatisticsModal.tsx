@@ -65,7 +65,7 @@ const ClientStatisticsModal: React.FC<ClientStatisticsModalProps> = ({
   // Compute meeting stats
   const totalMeetings = data?.client_stats.total_meetings || 0;
   const doneMeetings = data?.client_stats.done_meetings || 0;
-  const scheduledMeetings = totalMeetings - doneMeetings;
+  const canceledMeetings = data?.client_stats.canceled_meetings || 0;
   const meetingDates = data?.meetings.map((m) => formatDate(m.start_time)) || [];
   const totalPrice = data?.client_stats.total_revenue || 0;
   // Paid info: sum of price_total for meetings where paid=true
@@ -106,7 +106,7 @@ const ClientStatisticsModal: React.FC<ClientStatisticsModalProps> = ({
                 <Text fontWeight="bold">Meetings:</Text>
                 <Text>Total meetings: {totalMeetings}</Text>
                 <Text>Done: {doneMeetings}</Text>
-                <Text>Scheduled: {scheduledMeetings}</Text>
+                <Text>Canceled: {canceledMeetings}</Text>
                 <Text>Meeting dates:</Text>
                 <List spacing={1} pl={4}>
                   {meetingDates.length > 0 ? meetingDates.map((d, i) => (

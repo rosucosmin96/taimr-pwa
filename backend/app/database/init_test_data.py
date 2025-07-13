@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
+from app.api.commons.shared import ensure_utc
 from app.models.meeting import MeetingStatus
 
 from ..models import Client, Meeting, Membership, Service, User
@@ -150,8 +151,12 @@ def create_test_meetings(
             title="Website Consultation",
             recurrence_id=None,
             membership_id=memberships[0].id,  # John's membership
-            start_time=datetime.combine(today, datetime.min.time().replace(hour=9)),
-            end_time=datetime.combine(today, datetime.min.time().replace(hour=11)),
+            start_time=ensure_utc(
+                datetime.combine(today, datetime.min.time().replace(hour=9))
+            ),
+            end_time=ensure_utc(
+                datetime.combine(today, datetime.min.time().replace(hour=11))
+            ),
             price_per_hour=80.0,
             price_total=160.0,
             status=MeetingStatus.DONE.value,
@@ -165,12 +170,16 @@ def create_test_meetings(
             title="Logo Design",
             recurrence_id=None,
             membership_id=memberships[1].id,  # Sarah's membership
-            start_time=datetime.combine(
-                today + timedelta(days=1), datetime.min.time().replace(hour=14)
+            start_time=ensure_utc(
+                datetime.combine(
+                    today + timedelta(days=1), datetime.min.time().replace(hour=14)
+                )
             ),
-            end_time=datetime.combine(
-                today + timedelta(days=1),
-                datetime.min.time().replace(hour=15, minute=30),
+            end_time=ensure_utc(
+                datetime.combine(
+                    today + timedelta(days=1),
+                    datetime.min.time().replace(hour=15, minute=30),
+                )
             ),
             price_per_hour=60.0,
             price_total=90.0,
@@ -185,11 +194,15 @@ def create_test_meetings(
             title="Business Strategy",
             recurrence_id=None,
             membership_id=None,  # No membership for this meeting
-            start_time=datetime.combine(
-                today + timedelta(days=2), datetime.min.time().replace(hour=10)
+            start_time=ensure_utc(
+                datetime.combine(
+                    today + timedelta(days=2), datetime.min.time().replace(hour=10)
+                )
             ),
-            end_time=datetime.combine(
-                today + timedelta(days=2), datetime.min.time().replace(hour=11)
+            end_time=ensure_utc(
+                datetime.combine(
+                    today + timedelta(days=2), datetime.min.time().replace(hour=11)
+                )
             ),
             price_per_hour=110.0,
             price_total=110.0,
@@ -230,7 +243,7 @@ def create_test_memberships(
             availability_days=90,
             status="active",
             paid=True,
-            start_date=datetime.now(UTC) - timedelta(days=30),
+            start_date=ensure_utc(datetime.now(UTC) - timedelta(days=30)),
         ),
         Membership(
             id=str(uuid4()),
@@ -244,7 +257,7 @@ def create_test_memberships(
             availability_days=60,
             status="active",
             paid=False,
-            start_date=datetime.now(UTC) - timedelta(days=15),
+            start_date=ensure_utc(datetime.now(UTC) - timedelta(days=15)),
         ),
         Membership(
             id=str(uuid4()),
@@ -258,7 +271,7 @@ def create_test_memberships(
             availability_days=120,
             status="expired",
             paid=True,
-            start_date=datetime.now(UTC) - timedelta(days=150),
+            start_date=ensure_utc(datetime.now(UTC) - timedelta(days=150)),
         ),
     ]
 

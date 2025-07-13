@@ -35,6 +35,14 @@ class Settings(BaseSettings):
         "ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"
     )
 
+    # Scheduler settings
+    scheduler_jobstore_url: str = os.getenv(
+        "SCHEDULER_JOBSTORE_URL", "sqlite:///scheduler_jobs.db"
+    )
+    enable_meeting_status_updates: bool = (
+        os.getenv("ENABLE_MEETING_STATUS_UPDATES", "true").lower() == "true"
+    )
+
     class Config:
         env_file = ".env"
         extra = "ignore"  # Ignore extra fields instead of raising errors

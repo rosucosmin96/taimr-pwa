@@ -32,6 +32,17 @@ interface MeetingModalProps {
   onSuccess: () => void;
 }
 
+// Utility: Convert local datetime string (yyyy-MM-ddTHH:mm) to UTC ISO string
+function localDateTimeToUTCISOString(localDateTime: string): string {
+  // localDateTime is in 'yyyy-MM-ddTHH:mm' format
+  const [datePart, timePart] = localDateTime.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = timePart.split(':').map(Number);
+  // JS Date: months are 0-based
+  const localDate = new Date(year, month - 1, day, hour, minute);
+  return localDate.toISOString();
+}
+
 const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const toast = useToast();
   const [services, setServices] = useState<Service[]>([]);
@@ -269,8 +280,8 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
           service_id: serviceId,
           client_id: clientId,
           title,
-          start_time: new Date(startTime).toISOString(),
-          end_time: new Date(endTime).toISOString(),
+          start_time: localDateTimeToUTCISOString(startTime),
+          end_time: localDateTimeToUTCISOString(endTime),
           price_per_hour: parseFloat(pricePerHour),
           status,
           paid,

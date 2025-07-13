@@ -83,7 +83,7 @@ const MembershipViewModal: React.FC<MembershipViewModalProps> = ({ membership, o
               </Box>
               <Divider />
               <Flex gap={8} wrap="wrap">
-                <Text fontSize="sm">Total Meetings<br /><b>{currentMembership.total_meetings}</b></Text>
+                <Text fontSize="sm">Total Meetings<br /><b>{meetings.filter((m) => m.status === 'done').length} / {currentMembership.total_meetings}</b></Text>
                 <Text fontSize="sm">Price per Meeting<br /><b>${currentMembership.price_per_meeting}</b></Text>
                 <Text fontSize="sm">Total Price<br /><b>${currentMembership.price_per_membership}</b></Text>
                 <Text fontSize="sm">Availability<br /><b>{currentMembership.availability_days} days</b></Text>

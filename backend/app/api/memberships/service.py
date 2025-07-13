@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.api.commons.shared import ensure_utc
 from app.api.memberships.model import (
     MembershipCreateRequest,
     MembershipResponse,
@@ -249,7 +250,7 @@ class MembershipService:
         )
 
         if db_membership and not db_membership.start_date:
-            db_membership.start_date = start_date
+            db_membership.start_date = ensure_utc(start_date)
             self.db.commit()
 
     def _to_response(self, membership: MembershipModel) -> MembershipResponse:
@@ -266,6 +267,8 @@ class MembershipService:
             availability_days=membership.availability_days,
             status=MembershipStatus(membership.status),
             paid=membership.paid,
-            start_date=membership.start_date,
-            created_at=membership.created_at,
+            start_date=(
+                ensure_utc(membership.start_date) if membership.start_date else None
+            ),
+            created_at=ensure_utc(membership.created_at),
         )

@@ -226,16 +226,18 @@ const Stats: React.FC = () => {
               const stats = item.client_stats;
               const totalRevenue = stats.total_revenue;
               const totalMeetings = stats.total_meetings;
+              const doneMeetings = stats.done_meetings;
               const hours = stats.total_hours;
               return {
                 clientId: stats.client_id,
                 clientName: stats.client_name,
                 totalMeetings,
+                doneMeetings,
                 canceledMeetings: stats.canceled_meetings,
                 totalRevenue,
                 pricePerHour: hours > 0 ? totalRevenue / hours : 0,
                 hours,
-                pricePerMeeting: totalMeetings > 0 ? totalRevenue / totalMeetings : 0,
+                pricePerMeeting: doneMeetings > 0 ? totalRevenue / doneMeetings : 0,
                 // Optionally, you can add: meetings: item.meetings
               };
             }));
@@ -368,8 +370,8 @@ const Stats: React.FC = () => {
       color: 'blue.100'
     },
     {
-      title: 'Total Meetings',
-      value: stats?.total_meetings || 0,
+      title: 'Done Meetings',
+      value: stats?.done_meetings || 0,
       icon: <CalendarDaysIcon style={{ width: 28, height: 28 }} color="#805AD5" />,
       color: 'purple.100'
     },
@@ -394,7 +396,7 @@ const Stats: React.FC = () => {
     // New KPI: Price per Meeting
     {
       title: 'Price per Meeting',
-      value: `$${stats && stats.total_meetings > 0 ? (stats.total_revenue / stats.total_meetings).toFixed(2) : '0.00'}`,
+      value: `$${stats && stats.done_meetings > 0 ? (stats.total_revenue / stats.done_meetings).toFixed(2) : '0.00'}`,
       icon: <CurrencyDollarIcon style={{ width: 28, height: 28 }} color="#38A169" />,
       color: 'green.100'
     },
@@ -918,8 +920,8 @@ const Stats: React.FC = () => {
                                 <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{client.totalMeetings}</Text>
                               </Box>
                               <Box>
-                                <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Canceled</Text>
-                                <Text fontWeight="bold" color="red.500" fontSize={{ base: "sm", md: "md" }}>{client.canceledMeetings}</Text>
+                                <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Done Meetings</Text>
+                                <Text fontWeight="bold" color="red.500" fontSize={{ base: "sm", md: "md" }}>{client.doneMeetings}</Text>
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Revenue</Text>
@@ -951,7 +953,7 @@ const Stats: React.FC = () => {
                           <Tr>
                             <Th fontSize={{ base: "xs", md: "sm" }}>Client</Th>
                             <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Total Meetings</Th>
-                            <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Canceled Meetings</Th>
+                            <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Done Meetings</Th>
                             <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Total Revenue</Th>
                             <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Price Per Hour</Th>
                             <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Total Hours</Th>
@@ -970,7 +972,7 @@ const Stats: React.FC = () => {
                             >
                               <Td fontWeight="medium" fontSize={{ base: "xs", md: "sm" }}>{client.clientName}</Td>
                               <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.totalMeetings}</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.canceledMeetings}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.doneMeetings}</Td>
                               <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${safeToFixed(client.totalRevenue)}</Td>
                               <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${safeToFixed(client.pricePerHour)}</Td>
                               <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{safeToFixed(client.hours, 1)}h</Td>

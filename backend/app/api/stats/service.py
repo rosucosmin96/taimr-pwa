@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.api.commons.shared import ensure_utc
 from app.api.meetings.model import MeetingResponse
 from app.api.stats.model import (
     ClientStats,
@@ -31,9 +32,9 @@ class StatsService:
         """Get overview statistics for a user (all calculations in Python)"""
         query = self.db.query(MeetingModel).filter(MeetingModel.user_id == str(user_id))
         if start_date:
-            query = query.filter(MeetingModel.start_time >= start_date)
+            query = query.filter(MeetingModel.start_time >= ensure_utc(start_date))
         if end_date:
-            query = query.filter(MeetingModel.start_time <= end_date)
+            query = query.filter(MeetingModel.start_time <= ensure_utc(end_date))
         if service_id:
             query = query.filter(MeetingModel.service_id == str(service_id))
         meetings = query.all()
@@ -124,11 +125,11 @@ class StatsService:
             )
             if start_date:
                 meetings_query = meetings_query.filter(
-                    MeetingModel.start_time >= start_date
+                    MeetingModel.start_time >= ensure_utc(start_date)
                 )
             if end_date:
                 meetings_query = meetings_query.filter(
-                    MeetingModel.start_time <= end_date
+                    MeetingModel.start_time <= ensure_utc(end_date)
                 )
             meetings = meetings_query.all()
             if not meetings:
@@ -161,7 +162,9 @@ class StatsService:
                 canceled_meetings=canceled_meetings,
                 total_revenue=total_revenue,
                 total_hours=total_hours,
-                last_meeting=last_meeting.start_time if last_meeting else None,
+                last_meeting=(
+                    ensure_utc(last_meeting.start_time) if last_meeting else None
+                ),
             )
             client_stats.append(
                 ClientStatsResponse(
@@ -191,10 +194,12 @@ class StatsService:
         )
         if start_date:
             meetings_query = meetings_query.filter(
-                MeetingModel.start_time >= start_date
+                MeetingModel.start_time >= ensure_utc(start_date)
             )
         if end_date:
-            meetings_query = meetings_query.filter(MeetingModel.start_time <= end_date)
+            meetings_query = meetings_query.filter(
+                MeetingModel.start_time <= ensure_utc(end_date)
+            )
         meetings = meetings_query.all()
         # Compute stats
         total_meetings = len(meetings)
@@ -213,7 +218,7 @@ class StatsService:
             canceled_meetings=canceled_meetings,
             total_revenue=total_revenue,
             total_hours=total_hours,
-            last_meeting=last_meeting.start_time if last_meeting else None,
+            last_meeting=ensure_utc(last_meeting.start_time) if last_meeting else None,
         )
         return ClientStatsResponse(
             client_stats=client_stats,
@@ -230,8 +235,8 @@ class StatsService:
         """Get daily breakdown of revenue and meetings for a user (all calculations in Python)"""
         query = self.db.query(MeetingModel).filter(
             MeetingModel.user_id == str(user_id),
-            MeetingModel.start_time >= start_date,
-            MeetingModel.start_time <= end_date,
+            MeetingModel.start_time >= ensure_utc(start_date),
+            MeetingModel.start_time <= ensure_utc(end_date),
             MeetingModel.status.in_(
                 [MeetingStatus.DONE.value, MeetingStatus.UPCOMING.value]
             ),

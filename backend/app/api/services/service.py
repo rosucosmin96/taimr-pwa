@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.api.commons.shared import ensure_utc
 from app.api.services.model import (
     ServiceCreateRequest,
     ServiceResponse,
@@ -99,5 +100,5 @@ class ServiceService:
             name=service.name,
             default_duration_minutes=service.default_duration_minutes,
             default_price_per_hour=service.default_price_per_hour,
-            created_at=service.created_at,
+            created_at=ensure_utc(service.created_at),
         )

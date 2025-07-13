@@ -36,6 +36,8 @@ async def create_meeting(
 ):
     """Create a new meeting"""
     service = MeetingService(db)
+    print(meeting.start_time)
+    print(meeting.end_time)
     return await service.create_meeting(user_id, meeting)
 
 

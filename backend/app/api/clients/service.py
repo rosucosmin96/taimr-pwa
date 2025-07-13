@@ -8,6 +8,7 @@ from app.api.clients.model import (
     ClientResponse,
     ClientUpdateRequest,
 )
+from app.api.commons.shared import ensure_utc
 from app.models import Client as ClientModel
 
 
@@ -114,5 +115,5 @@ class ClientService:
             phone=client.phone,
             custom_duration_minutes=client.custom_duration_minutes,
             custom_price_per_hour=client.custom_price_per_hour,
-            created_at=client.created_at,
+            created_at=ensure_utc(client.created_at),
         )

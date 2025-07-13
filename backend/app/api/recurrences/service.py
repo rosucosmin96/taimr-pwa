@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from app.api.commons.shared import RecurrenceUpdateScope
+from app.api.commons.shared import RecurrenceUpdateScope, ensure_utc
 from app.api.meetings.model import MeetingCreateRequest, MeetingResponse, MeetingStatus
 from app.api.meetings.service import MeetingService
 from app.api.recurrences.model import (
@@ -36,11 +36,11 @@ class RecurrenceService:
 
         while current_date <= end_date:
             # Create meeting instance using the time conversion methods
-            start_datetime = datetime.combine(
-                current_date.date(), recurrence.get_start_time()
+            start_datetime = ensure_utc(
+                datetime.combine(current_date.date(), recurrence.get_start_time())
             )
-            end_datetime = datetime.combine(
-                current_date.date(), recurrence.get_end_time()
+            end_datetime = ensure_utc(
+                datetime.combine(current_date.date(), recurrence.get_end_time())
             )
 
             instance = MeetingCreateRequest(
@@ -82,8 +82,8 @@ class RecurrenceService:
             service_id=str(recurrence.service_id),
             client_id=str(recurrence.client_id),
             frequency=recurrence.frequency.value,
-            start_date=recurrence.start_date,
-            end_date=recurrence.end_date,
+            start_date=ensure_utc(recurrence.start_date),
+            end_date=ensure_utc(recurrence.end_date) if recurrence.end_date else None,
             title=recurrence.title,
             start_time=recurrence.start_time,
             end_time=recurrence.end_time,
@@ -227,11 +227,11 @@ class RecurrenceService:
             service_id=UUID(recurrence.service_id),
             client_id=UUID(recurrence.client_id),
             frequency=recurrence.frequency,
-            start_date=recurrence.start_date,
-            end_date=recurrence.end_date,
+            start_date=ensure_utc(recurrence.start_date),
+            end_date=ensure_utc(recurrence.end_date) if recurrence.end_date else None,
             title=recurrence.title,
             start_time=recurrence.start_time,
             end_time=recurrence.end_time,
             price_per_hour=recurrence.price_per_hour,
-            created_at=recurrence.created_at,
+            created_at=ensure_utc(recurrence.created_at),
         )
