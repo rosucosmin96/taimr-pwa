@@ -177,6 +177,28 @@ export interface ClientStatsResponse {
   meetings: Meeting[];
 }
 
+// Notification types
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  related_entity_id?: string;
+  related_entity_type?: string;
+  read: boolean;
+  read_at?: string;
+  created_at: string;
+}
+
+export interface NotificationUpdateRequest {
+  read?: boolean;
+}
+
+export interface NotificationMarkReadRequest {
+  notification_ids: string[];
+}
+
 // API client with authentication
 class ApiClient {
   private baseUrl: string;
@@ -453,6 +475,34 @@ class ApiClient {
 
   async getMembershipMeetings(membershipId: string): Promise<Meeting[]> {
     return this.request<Meeting[]>(`/memberships/${membershipId}/meetings`);
+  }
+
+  // Notifications API
+  async getNotifications(unreadOnly?: boolean): Promise<Notification[]> {
+    const params = new URLSearchParams();
+    if (unreadOnly) params.append('unread_only', 'true');
+    const queryString = params.toString();
+    return this.request<Notification[]>(`/notifications/${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async updateNotification(id: string, data: NotificationUpdateRequest): Promise<Notification> {
+    return this.request<Notification>(`/notifications/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async markNotificationsRead(notificationIds: string[]): Promise<Notification[]> {
+    return this.request<Notification[]>('/notifications/mark-read', {
+      method: 'POST',
+      body: JSON.stringify({ notification_ids: notificationIds }),
+    });
+  }
+
+  async deleteNotification(id: string): Promise<void> {
+    await this.request(`/notifications/${id}`, {
+      method: 'DELETE',
+    });
   }
 }
 

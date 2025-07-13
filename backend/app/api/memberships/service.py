@@ -11,6 +11,7 @@ from app.api.memberships.model import (
     MembershipStatus,
     MembershipUpdateRequest,
 )
+from app.api.notifications.service import NotificationService
 from app.models import Meeting as MeetingModel
 from app.models import Membership as MembershipModel
 
@@ -209,6 +210,8 @@ class MembershipService:
 
         for membership in memberships:
             should_expire = False
+            should_notify_availability = False
+            should_notify_expiring = False
 
             # Check time-based expiration
             if membership.start_date:
@@ -217,6 +220,8 @@ class MembershipService:
                 )
                 if datetime.now() > expiration_date:
                     should_expire = True
+                elif datetime.now() > expiration_date - timedelta(days=7):
+                    should_notify_availability = True
 
             # Check meeting count-based expiration
             if not should_expire:
@@ -233,9 +238,29 @@ class MembershipService:
 
                 if done_meetings_count >= membership.total_meetings:
                     should_expire = True
+                elif membership.total_meetings - done_meetings_count == 1:
+                    should_notify_expiring = True
 
             if should_expire:
                 membership.status = MembershipStatus.EXPIRED.value
+            elif should_notify_availability:
+                notification_service = NotificationService(self.db)
+                notification_service.create_notification(
+                    user_id=UUID(membership.user_id),
+                    title=f"Membership {membership.name} Expiring Soon",
+                    message=f"Your membership for {membership.name} is expiring on {membership.start_date + timedelta(days=membership.availability_days)}.",
+                    related_entity_id=UUID(membership.id),
+                    related_entity_type="membership",
+                )
+            elif should_notify_expiring:
+                notification_service = NotificationService(self.db)
+                notification_service.create_notification(
+                    user_id=UUID(membership.user_id),
+                    title=f"Membership {membership.name} Expiring Soon",
+                    message=f"Your membership for {membership.name} has only one meeting left.",
+                    related_entity_id=UUID(membership.id),
+                    related_entity_type="membership",
+                )
 
         self.db.commit()
 

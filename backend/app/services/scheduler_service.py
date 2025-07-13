@@ -1,5 +1,4 @@
 import logging
-from collections.abc import Callable
 from datetime import datetime
 from uuid import UUID
 
@@ -7,7 +6,9 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.api.commons.shared import ensure_utc
+from app.api.meetings.model import MeetingStatus
 from app.config import settings
+from app.models import Meeting as MeetingModel
 
 logger = logging.getLogger(__name__)
 
@@ -79,9 +80,7 @@ class SchedulerService:
             self.scheduler.shutdown()
             logger.info("Scheduler shutdown successfully")
 
-    def schedule_meeting_status_update(
-        self, func: Callable, meeting_id: UUID, end_time: datetime
-    ):
+    def schedule_meeting_status_update(self, meeting_id: UUID, end_time: datetime):
         """Schedule a job to update meeting status when it ends."""
         if not self.scheduler or not settings.enable_meeting_status_updates:
             return
@@ -94,7 +93,7 @@ class SchedulerService:
 
         # Schedule new job
         self.scheduler.add_job(
-            func=func,
+            func=update_meeting_status,
             trigger="date",
             run_date=ensure_utc(end_time),
             id=job_id,
@@ -133,6 +132,40 @@ class SchedulerService:
                 }
             )
         return jobs
+
+
+def update_meeting_status(meeting_id: str):
+    """Standalone function to update meeting status from 'upcoming' to 'done' when meeting ends."""
+    try:
+        from app.database.session import get_db
+
+        # Get a new database session
+        db = next(get_db())
+
+        # Get the meeting
+        meeting = db.query(MeetingModel).filter(MeetingModel.id == meeting_id).first()
+
+        if not meeting:
+            logger.warning(f"Meeting {meeting_id} not found for status update")
+            return
+
+        # Only update if status is still 'upcoming'
+        if meeting.status == MeetingStatus.UPCOMING.value:
+            meeting.status = MeetingStatus.DONE.value
+            db.commit()
+            logger.info(f"Updated meeting {meeting_id} status to 'done'")
+        else:
+            logger.info(
+                f"Meeting {meeting_id} status is already '{meeting.status}', skipping update"
+            )
+
+    except Exception as e:
+        logger.error(f"Error updating meeting {meeting_id} status: {e}")
+        if "db" in locals():
+            db.rollback()
+    finally:
+        if "db" in locals():
+            db.close()
 
 
 async def check_membership_status_updates():

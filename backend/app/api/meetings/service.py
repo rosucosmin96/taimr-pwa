@@ -99,7 +99,7 @@ class MeetingService:
         # Schedule status update job if meeting is upcoming
         if db_meeting.status == MeetingStatus.UPCOMING.value:
             scheduler_service.schedule_meeting_status_update(
-                update_meeting_status, UUID(db_meeting.id), db_meeting.end_time
+                UUID(db_meeting.id), db_meeting.end_time
             )
 
         return self._to_response(db_meeting)
@@ -185,7 +185,7 @@ class MeetingService:
         if update_data.end_time is not None:
             if meeting.status == MeetingStatus.UPCOMING.value:
                 scheduler_service.schedule_meeting_status_update(
-                    update_meeting_status, UUID(meeting.id), meeting.end_time
+                    UUID(meeting.id), meeting.end_time
                 )
             else:
                 # Cancel job if status is no longer upcoming
@@ -307,37 +307,3 @@ class MeetingService:
             paid=meeting.paid,
             created_at=ensure_utc(meeting.created_at),
         )
-
-
-def update_meeting_status(meeting_id: str):
-    """Standalone function to update meeting status from 'upcoming' to 'done' when meeting ends."""
-    try:
-        from app.database.session import get_db
-
-        # Get a new database session
-        db = next(get_db())
-
-        # Get the meeting
-        meeting = db.query(MeetingModel).filter(MeetingModel.id == meeting_id).first()
-
-        if not meeting:
-            logger.warning(f"Meeting {meeting_id} not found for status update")
-            return
-
-        # Only update if status is still 'upcoming'
-        if meeting.status == MeetingStatus.UPCOMING.value:
-            meeting.status = MeetingStatus.DONE.value
-            db.commit()
-            logger.info(f"Updated meeting {meeting_id} status to 'done'")
-        else:
-            logger.info(
-                f"Meeting {meeting_id} status is already '{meeting.status}', skipping update"
-            )
-
-    except Exception as e:
-        logger.error(f"Error updating meeting {meeting_id} status: {e}")
-        if "db" in locals():
-            db.rollback()
-    finally:
-        if "db" in locals():
-            db.close()

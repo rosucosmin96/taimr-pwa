@@ -9,6 +9,7 @@ import Memberships from './pages/Memberships';
 import Stats from './pages/Stats';
 import Profile from './pages/Profile';
 import Calendar from './pages/Calendar';
+import Notifications from './pages/Notifications';
 import { ChakraProvider, Box, Flex, IconButton, Text, useBreakpointValue, Drawer, DrawerOverlay, DrawerContent, DrawerCloseButton, DrawerBody, VStack } from '@chakra-ui/react';
 import { apiClient, Profile as UserProfile } from './lib/api';
 
@@ -20,6 +21,7 @@ const navItems = [
   { name: 'Memberships', path: '/memberships' },
   { name: 'Statistics', path: '/stats' },
   { name: 'Calendar', path: '/calendar' },
+  { name: 'Notifications', path: '/notifications' },
 ];
 
 function Sidebar({ open, onClose, user }: { open: boolean; onClose: () => void; user?: UserProfile }) {
@@ -198,6 +200,7 @@ const App: React.FC = () => (
           <Route path="/memberships" element={<Memberships />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/calendar" element={<Calendar />} />
+          <Route path="/notifications" element={<Notifications />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>

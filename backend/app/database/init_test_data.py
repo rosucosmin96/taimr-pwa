@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.api.commons.shared import ensure_utc
 from app.models.meeting import MeetingStatus
 
-from ..models import Client, Meeting, Membership, Service, User
+from ..models import Client, Meeting, Membership, Notification, Service, User
 from .factory import DatabaseFactory
 
 logger = logging.getLogger(__name__)
@@ -282,6 +282,64 @@ def create_test_memberships(
     return memberships
 
 
+def create_test_notifications(
+    session: Session, user_id: str, memberships: list[Membership]
+) -> list[Notification]:
+    """Create test notifications if they don't exist."""
+    # Check if notifications already exist
+    existing_notifications = (
+        session.query(Notification).filter(Notification.user_id == user_id).all()
+    )
+    if existing_notifications:
+        logger.info(f"Found {len(existing_notifications)} existing test notifications")
+        return existing_notifications
+
+    notifications = [
+        Notification(
+            id=str(uuid4()),
+            user_id=user_id,
+            type="membership_expiring",
+            title="Membership Expiring Soon",
+            message=f"'{memberships[0].name}' for John Smith expires in 5 days.",
+            related_entity_id=memberships[0].id,
+            related_entity_type="membership",
+            read=False,
+            read_at=None,
+            created_at=ensure_utc(datetime.now(UTC) - timedelta(days=5)),
+        ),
+        Notification(
+            id=str(uuid4()),
+            user_id=user_id,
+            type="membership_expired",
+            title="Membership Expired",
+            message=f"'{memberships[2].name}' for Mike Wilson has expired.",
+            related_entity_id=memberships[2].id,
+            related_entity_type="membership",
+            read=False,
+            read_at=None,
+            created_at=ensure_utc(datetime.now(UTC) - timedelta(days=1)),
+        ),
+        Notification(
+            id=str(uuid4()),
+            user_id=user_id,
+            type="meeting_reminder",
+            title="Upcoming Meeting Reminder",
+            message="You have a meeting with Sarah Johnson tomorrow at 2:00 PM.",
+            related_entity_id=memberships[1].id,
+            related_entity_type="membership",
+            read=False,
+            read_at=None,
+            created_at=ensure_utc(datetime.now(UTC)),
+        ),
+    ]
+
+    for notification in notifications:
+        session.add(notification)
+    session.commit()
+    logger.info("✅ Created test notifications")
+    return notifications
+
+
 def init_test_data() -> bool:
     """
     Initialize database with test data safely.
@@ -310,6 +368,9 @@ def init_test_data() -> bool:
 
             # Create test memberships
             memberships = create_test_memberships(session, user.id, services, clients)
+
+            # Create test notifications
+            create_test_notifications(session, user.id, memberships)
 
             # Create test meetings
             meetings = create_test_meetings(
