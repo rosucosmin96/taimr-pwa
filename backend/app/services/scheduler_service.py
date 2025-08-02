@@ -6,9 +6,7 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.api.commons.shared import ensure_utc
-from app.api.meetings.model import MeetingStatus
 from app.config import settings
-from app.models import Meeting as MeetingModel
 
 logger = logging.getLogger(__name__)
 
@@ -21,15 +19,21 @@ class SchedulerService:
         self._initialize_scheduler()
 
     def _initialize_scheduler(self):
-        """Initialize the APScheduler with SQLite job store for persistence."""
+        """Initialize the APScheduler with appropriate job store."""
         if not settings.enable_meeting_status_updates:
             logger.info("Meeting status updates are disabled")
             return
 
         try:
-            jobstores = {
-                "default": SQLAlchemyJobStore(url=settings.scheduler_jobstore_url)
-            }
+            # Use SQLite for development, Supabase for production
+            if settings.environment == "dev":
+                jobstore_url = settings.scheduler_jobstore_url
+            else:
+                # For production, use SQLite in memory since Supabase doesn't support direct PostgreSQL connections
+                jobstore_url = "sqlite:///:memory:"
+                logger.info("Using in-memory SQLite for scheduler jobs in production")
+
+            jobstores = {"default": SQLAlchemyJobStore(url=jobstore_url)}
 
             self.scheduler = AsyncIOScheduler(
                 jobstores=jobstores,
@@ -137,71 +141,134 @@ class SchedulerService:
 def update_meeting_status(meeting_id: str):
     """Standalone function to update meeting status from 'upcoming' to 'done' when meeting ends."""
     try:
-        from app.database.session import get_db
+        if settings.environment == "dev":
+            # Use SQLite for development - direct database access for scheduler
+            from sqlalchemy import create_engine
+            from sqlalchemy.orm import sessionmaker
 
-        # Get a new database session
-        db = next(get_db())
+            from app.api.meetings.model import MeetingStatus
+            from app.models import Meeting as MeetingModel
 
-        # Get the meeting
-        meeting = db.query(MeetingModel).filter(MeetingModel.id == meeting_id).first()
+            engine = create_engine(f"sqlite:///{settings.database_path}")
+            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+            db = SessionLocal()
 
-        if not meeting:
-            logger.warning(f"Meeting {meeting_id} not found for status update")
-            return
-
-        # Only update if status is still 'upcoming'
-        if meeting.status == MeetingStatus.UPCOMING.value:
-            meeting.status = MeetingStatus.DONE.value
-            db.commit()
-            logger.info(f"Updated meeting {meeting_id} status to 'done'")
-        else:
-            logger.info(
-                f"Meeting {meeting_id} status is already '{meeting.status}', skipping update"
+            meeting = (
+                db.query(MeetingModel).filter(MeetingModel.id == meeting_id).first()
             )
+
+            if not meeting:
+                logger.warning(f"Meeting {meeting_id} not found for status update")
+                db.close()
+                return
+
+            if meeting.status == MeetingStatus.UPCOMING.value:
+                meeting.status = MeetingStatus.DONE.value
+                db.commit()
+                logger.info(f"Updated meeting {meeting_id} status to 'done'")
+            else:
+                logger.info(
+                    f"Meeting {meeting_id} status is already '{meeting.status}', skipping update"
+                )
+
+            db.close()
+        else:
+            # Use Supabase SDK for production - direct access for scheduler
+            from supabase import create_client
+
+            supabase_client = create_client(
+                settings.supabase_url, settings.supabase_service_role_key
+            )
+
+            # Get the meeting from Supabase
+            response = (
+                supabase_client.table("meetings")
+                .select("*")
+                .eq("id", meeting_id)
+                .execute()
+            )
+            meeting_data = response.data[0] if response.data else None
+
+            if not meeting_data:
+                logger.warning(f"Meeting {meeting_id} not found for status update")
+                return
+
+            if meeting_data.get("status") == "upcoming":
+                # Update the meeting status
+                result = (
+                    supabase_client.table("meetings")
+                    .update({"status": "done"})
+                    .eq("id", meeting_id)
+                    .execute()
+                )
+                if result.data:
+                    logger.info(f"Updated meeting {meeting_id} status to 'done'")
+                else:
+                    logger.error(f"Failed to update meeting {meeting_id} status")
+            else:
+                logger.info(
+                    f"Meeting {meeting_id} status is already '{meeting_data.get('status')}', skipping update"
+                )
 
     except Exception as e:
         logger.error(f"Error updating meeting {meeting_id} status: {e}")
-        if "db" in locals():
-            db.rollback()
-    finally:
-        if "db" in locals():
-            db.close()
 
 
 async def check_membership_status_updates():
     """Standalone function to check and update membership statuses daily."""
     try:
+        # Use MembershipService without database session
         from app.api.memberships.service import MembershipService
-        from app.database.session import get_db
-        from app.models import User
 
-        # Get a new database session
-        db = next(get_db())
+        # Create membership service without database session
+        membership_service = MembershipService()
 
-        # Get all users to check their memberships
-        users = db.query(User).all()
+        # Get all users from the database
+        if settings.environment == "dev":
+            # Use SQLite for development
+            from sqlalchemy import create_engine
+            from sqlalchemy.orm import sessionmaker
 
-        membership_service = MembershipService(db)
+            from app.models import User as UserModel
+
+            engine = create_engine(f"sqlite:///{settings.database_path}")
+            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+            db = SessionLocal()
+
+            users = db.query(UserModel).all()
+            user_ids = [user.id for user in users]
+            db.close()
+        else:
+            # Use Supabase SDK for production
+            from supabase import create_client
+
+            supabase_client = create_client(
+                settings.supabase_url, settings.supabase_service_role_key
+            )
+
+            # Get all users from Supabase
+            response = supabase_client.table("users").select("id").execute()
+            user_ids = [user["id"] for user in response.data]
+
+        # Update membership statuses for each user
         updated_count = 0
-
-        for user in users:
+        for user_id in user_ids:
             try:
-                await membership_service.update_membership_status(user.id)
+                await membership_service.update_membership_status(user_id)
                 updated_count += 1
+                logger.info(f"Updated membership statuses for user {user_id}")
             except Exception as e:
-                logger.error(f"Error updating memberships for user {user.id}: {e}")
+                logger.error(
+                    f"Failed to update membership statuses for user {user_id}: {e}"
+                )
+                continue
 
         logger.info(
-            f"Daily membership status check completed. Updated {updated_count} users."
+            f"Daily membership status check completed. Updated {updated_count}/{len(user_ids)} users."
         )
 
     except Exception as e:
         logger.error(f"Error in daily membership status check: {e}")
-        if "db" in locals():
-            db.rollback()
-    finally:
-        if "db" in locals():
-            db.close()
 
 
 # Global scheduler instance

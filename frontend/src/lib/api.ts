@@ -67,9 +67,9 @@ export interface StatsOverview {
 
 // Recurrence types
 export interface RecurrenceFrequency {
-  weekly: 'weekly';
-  biweekly: 'biweekly';
-  monthly: 'monthly';
+  weekly: 'WEEKLY';
+  biweekly: 'BIWEEKLY';
+  monthly: 'MONTHLY';
 }
 
 export interface RecurrenceUpdateScope {
@@ -81,7 +81,7 @@ export interface RecurrenceUpdateScope {
 export interface RecurrenceCreateRequest {
   service_id: string;
   client_id: string;
-  frequency: keyof RecurrenceFrequency;
+  frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
   start_date: string;
   end_date: string;
   title: string;
@@ -95,7 +95,7 @@ export interface RecurrenceResponse {
   user_id: string;
   service_id: string;
   client_id: string;
-  frequency: keyof RecurrenceFrequency;
+  frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
   start_date: string;
   end_date: string;
   title: string;
@@ -320,6 +320,10 @@ class ApiClient {
     return this.request<Meeting[]>(`/meetings/${queryString ? `?${queryString}` : ''}`);
   }
 
+  async getMeeting(id: string): Promise<Meeting> {
+    return this.request<Meeting>(`/meetings/${id}`);
+  }
+
   async createMeeting(data: {
     service_id: string;
     client_id: string;
@@ -348,8 +352,9 @@ class ApiClient {
     });
   }
 
-  async deleteMeeting(id: string): Promise<void> {
-    await this.request(`/meetings/${id}`, {
+  async deleteMeeting(id: string, deleteScope?: string): Promise<void> {
+    const params = deleteScope ? `?delete_scope=${deleteScope}` : '';
+    await this.request(`/meetings/${id}${params}`, {
       method: 'DELETE',
     });
   }
@@ -509,5 +514,15 @@ class ApiClient {
 // Create and export API client instance
 export const apiClient = new ApiClient(API_BASE_URL);
 
-// For development, set a mock token
-apiClient.setToken('test-token');
+// Function to update token from Supabase session
+export const updateApiToken = (token: string | null) => {
+  if (token) {
+    apiClient.setToken(token);
+  } else {
+    apiClient.setToken('');
+  }
+};
+
+// For development, set a dummy token
+// This will be overridden by updateApiToken when user logs in
+apiClient.setToken('dev-token');

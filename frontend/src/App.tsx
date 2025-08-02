@@ -10,7 +10,12 @@ import Stats from './pages/Stats';
 import Profile from './pages/Profile';
 import Calendar from './pages/Calendar';
 import Notifications from './pages/Notifications';
-import { ChakraProvider, Box, Flex, IconButton, Text, useBreakpointValue, Drawer, DrawerOverlay, DrawerContent, DrawerCloseButton, DrawerBody, VStack } from '@chakra-ui/react';
+import Login from './pages/Login';
+import SignUp from './pages/SignUp';
+import ForgotPassword from './pages/ForgotPassword';
+import ProtectedRoute from './components/ProtectedRoute';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ChakraProvider, Box, Flex, IconButton, Text, useBreakpointValue, Drawer, DrawerOverlay, DrawerContent, DrawerCloseButton, DrawerBody, VStack, Button } from '@chakra-ui/react';
 import { apiClient, Profile as UserProfile } from './lib/api';
 
 const navItems = [
@@ -26,7 +31,9 @@ const navItems = [
 
 function Sidebar({ open, onClose, user }: { open: boolean; onClose: () => void; user?: UserProfile }) {
   const location = useLocation();
+  const { signOut } = useAuth();
   const isDesktop = useBreakpointValue({ base: false, md: true });
+
   const navLinks = (
     <VStack align="stretch" spacing={1} mt={4}>
       {navItems.map((item) => (
@@ -52,52 +59,65 @@ function Sidebar({ open, onClose, user }: { open: boolean; onClose: () => void; 
 
   const profileButton = (
     <Box mt={8} px={4}>
-      <Flex
-        as={Link}
-        to="/profile"
-        align="center"
-        bg={location.pathname === '/profile' ? 'purple.100' : 'gray.100'}
-        color={location.pathname === '/profile' ? 'purple.700' : 'gray.700'}
-        borderRadius="lg"
-        p={2}
-        _hover={{ bg: 'purple.50', color: 'purple.700' }}
-        transition="background 0.2s"
-        onClick={onClose}
-      >
-        <Box boxSize={8} mr={3}>
-          {user?.profile_picture_url ? (
-            <img
-              src={user.profile_picture_url}
-              alt={user?.name || 'User'}
-              style={{ borderRadius: '9999px', width: '100%', height: '100%' }}
-            />
-          ) : (
-            <div
-              style={{
-                background: 'purple',
-                color: 'white',
-                borderRadius: '9999px',
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 'bold',
-                fontSize: '1.2em',
-                textTransform: 'uppercase',
-              }}
-            >
-              {user?.name
-                ? user.name
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                : ''}
-            </div>
-          )}
-        </Box>
-        <Text fontWeight="medium">{user?.name || 'User'}</Text>
-      </Flex>
+      <VStack spacing={3}>
+        <Flex
+          as={Link}
+          to="/profile"
+          align="center"
+          bg={location.pathname === '/profile' ? 'purple.100' : 'gray.100'}
+          color={location.pathname === '/profile' ? 'purple.700' : 'gray.700'}
+          borderRadius="lg"
+          p={2}
+          w="full"
+          _hover={{ bg: 'purple.50', color: 'purple.700' }}
+          transition="background 0.2s"
+          onClick={onClose}
+        >
+          <Box boxSize={8} mr={3}>
+            {user?.profile_picture_url ? (
+              <img
+                src={user.profile_picture_url}
+                alt={user?.name || 'User'}
+                style={{ borderRadius: '9999px', width: '100%', height: '100%' }}
+              />
+            ) : (
+              <div
+                style={{
+                  background: 'purple',
+                  color: 'white',
+                  borderRadius: '9999px',
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  fontSize: '1.2em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {user?.name
+                  ? user.name
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')
+                  : ''}
+              </div>
+            )}
+          </Box>
+          <Text fontWeight="medium">{user?.name || 'User'}</Text>
+        </Flex>
+
+        <Button
+          onClick={signOut}
+          variant="outline"
+          colorScheme="red"
+          size="sm"
+          w="full"
+        >
+          Sign Out
+        </Button>
+      </VStack>
     </Box>
   );
 
@@ -153,9 +173,11 @@ type AppLayoutProps = React.PropsWithChildren<{}>;
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<UserProfile | undefined>(undefined);
+
   useEffect(() => {
     apiClient.getProfile().then(setUser).catch(() => setUser(undefined));
   }, []);
+
   return (
     <Flex minH="100vh" bg="gray.50">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} />
@@ -188,24 +210,90 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   );
 };
 
+const AppRoutes: React.FC = () => (
+  <Routes>
+    {/* Public routes */}
+    <Route path="/login" element={<Login />} />
+    <Route path="/signup" element={<SignUp />} />
+    <Route path="/forgot-password" element={<ForgotPassword />} />
+
+    {/* Protected routes */}
+    <Route path="/dashboard" element={
+      <ProtectedRoute>
+        <AppLayout>
+          <Dashboard />
+        </AppLayout>
+      </ProtectedRoute>
+    } />
+    <Route path="/services" element={
+      <ProtectedRoute>
+        <AppLayout>
+          <Services />
+        </AppLayout>
+      </ProtectedRoute>
+    } />
+    <Route path="/meetings" element={
+      <ProtectedRoute>
+        <AppLayout>
+          <Meetings />
+        </AppLayout>
+      </ProtectedRoute>
+    } />
+    <Route path="/clients" element={
+      <ProtectedRoute>
+        <AppLayout>
+          <Clients />
+        </AppLayout>
+      </ProtectedRoute>
+    } />
+    <Route path="/memberships" element={
+      <ProtectedRoute>
+        <AppLayout>
+          <Memberships />
+        </AppLayout>
+      </ProtectedRoute>
+    } />
+    <Route path="/stats" element={
+      <ProtectedRoute>
+        <AppLayout>
+          <Stats />
+        </AppLayout>
+      </ProtectedRoute>
+    } />
+    <Route path="/calendar" element={
+      <ProtectedRoute>
+        <AppLayout>
+          <Calendar />
+        </AppLayout>
+      </ProtectedRoute>
+    } />
+    <Route path="/notifications" element={
+      <ProtectedRoute>
+        <AppLayout>
+          <Notifications />
+        </AppLayout>
+      </ProtectedRoute>
+    } />
+    <Route path="/profile" element={
+      <ProtectedRoute>
+        <AppLayout>
+          <Profile />
+        </AppLayout>
+      </ProtectedRoute>
+    } />
+
+    {/* Default redirect */}
+    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+  </Routes>
+);
+
 const App: React.FC = () => (
   <ChakraProvider>
-    <Router>
-      <AppLayout>
-        <Routes>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/meetings" element={<Meetings />} />
-          <Route path="/clients" element={<Clients />} />
-          <Route path="/memberships" element={<Memberships />} />
-          <Route path="/stats" element={<Stats />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/notifications" element={<Notifications />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </AppLayout>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <AppRoutes />
+      </Router>
+    </AuthProvider>
   </ChakraProvider>
 );
 

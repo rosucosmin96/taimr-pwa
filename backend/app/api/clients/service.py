@@ -1,119 +1,84 @@
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_
-from sqlalchemy.orm import Session
-
 from app.api.clients.model import (
     ClientCreateRequest,
     ClientResponse,
     ClientUpdateRequest,
 )
-from app.api.commons.shared import ensure_utc
 from app.models import Client as ClientModel
+from app.storage.factory import StorageFactory
 
 
 class ClientService:
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self):
+        self.storage = StorageFactory.create_storage_service(
+            model_class=ClientModel, response_class=ClientResponse, table_name="clients"
+        )
 
     async def get_clients(
         self, user_id: UUID, service_id: UUID | None = None
     ) -> list[ClientResponse]:
         """Get clients for a user, optionally filtered by service"""
-        query = self.db.query(ClientModel).filter(ClientModel.user_id == str(user_id))
-
+        filters = {}
         if service_id:
-            query = query.filter(ClientModel.service_id == str(service_id))
+            filters["service_id"] = str(service_id)
 
-        clients = query.all()
-        return [self._to_response(client) for client in clients]
+        return await self.storage.get_all(user_id, filters)
+
+    async def get_client(self, user_id: UUID, client_id: UUID) -> ClientResponse | None:
+        """Get a specific client by ID"""
+        return await self.storage.get_by_id(user_id, client_id)
 
     async def create_client(
         self, user_id: UUID, client: ClientCreateRequest
     ) -> ClientResponse:
         """Create a new client"""
-        db_client = ClientModel(
-            id=str(uuid4()),
-            user_id=str(user_id),
-            service_id=str(client.service_id),
-            name=client.name,
-            email=client.email,
-            phone=client.phone,
-            custom_duration_minutes=client.custom_duration_minutes,
-            custom_price_per_hour=client.custom_price_per_hour,
-        )
+        client_data = {
+            "id": str(uuid4()),
+            "service_id": str(client.service_id),
+            "name": client.name,
+            "email": client.email,
+            "phone": client.phone,
+            "custom_duration_minutes": client.custom_duration_minutes,
+            "custom_price_per_hour": client.custom_price_per_hour,
+        }
 
-        self.db.add(db_client)
-        self.db.commit()
-        self.db.refresh(db_client)
-
-        return self._to_response(db_client)
+        return await self.storage.create(user_id, client_data)
 
     async def update_client(
         self, user_id: UUID, client_id: UUID, client: ClientUpdateRequest
     ) -> ClientResponse:
         """Update an existing client"""
-        db_client = (
-            self.db.query(ClientModel)
-            .filter(
-                and_(
-                    ClientModel.id == str(client_id),
-                    ClientModel.user_id == str(user_id),
-                )
-            )
-            .first()
-        )
-
-        if not db_client:
+        # First check if client exists
+        existing_client = await self.storage.get_by_id(user_id, client_id)
+        if not existing_client:
             raise ValueError("Client not found")
 
+        # Prepare update data
+        update_data = {}
         if client.service_id is not None:
-            db_client.service_id = str(client.service_id)
+            update_data["service_id"] = str(client.service_id)
         if client.name is not None:
-            db_client.name = client.name
+            update_data["name"] = client.name
         if client.email is not None:
-            db_client.email = client.email
+            update_data["email"] = client.email
         if client.phone is not None:
-            db_client.phone = client.phone
+            update_data["phone"] = client.phone
         if client.custom_duration_minutes is not None:
-            db_client.custom_duration_minutes = client.custom_duration_minutes
+            update_data["custom_duration_minutes"] = client.custom_duration_minutes
         if client.custom_price_per_hour is not None:
-            db_client.custom_price_per_hour = client.custom_price_per_hour
+            update_data["custom_price_per_hour"] = client.custom_price_per_hour
 
-        self.db.commit()
-        self.db.refresh(db_client)
+        updated_client = await self.storage.update(user_id, client_id, update_data)
+        if not updated_client:
+            raise ValueError("Failed to update client")
 
-        return self._to_response(db_client)
+        return updated_client
 
     async def delete_client(self, user_id: UUID, client_id: UUID) -> bool:
         """Delete a client"""
-        db_client = (
-            self.db.query(ClientModel)
-            .filter(
-                and_(
-                    ClientModel.id == str(client_id),
-                    ClientModel.user_id == str(user_id),
-                )
-            )
-            .first()
-        )
+        return await self.storage.delete(user_id, client_id)
 
-        if db_client:
-            self.db.delete(db_client)
-            self.db.commit()
-            return True
-        return False
-
-    def _to_response(self, client: ClientModel) -> ClientResponse:
-        """Convert database model to response model"""
-        return ClientResponse(
-            id=UUID(client.id),
-            user_id=UUID(client.user_id),
-            service_id=UUID(client.service_id),
-            name=client.name,
-            email=client.email,
-            phone=client.phone,
-            custom_duration_minutes=client.custom_duration_minutes,
-            custom_price_per_hour=client.custom_price_per_hour,
-            created_at=ensure_utc(client.created_at),
-        )
+    async def client_exists(self, user_id: UUID, client_id: UUID) -> bool:
+        """Check if a client exists"""
+        return await self.storage.exists(user_id, client_id)

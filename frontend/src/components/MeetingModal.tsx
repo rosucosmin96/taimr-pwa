@@ -65,7 +65,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
 
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurrenceFrequency, setRecurrenceFrequency] = useState<'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'>('WEEKLY');
   const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
 
   // For duration logic
@@ -230,7 +230,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
 
     // Reset recurrence settings
     setIsRecurring(false);
-    setRecurrenceFrequency('weekly');
+            setRecurrenceFrequency('WEEKLY');
     setRecurrenceEndDate('');
   }, [isOpen, clientDuration, serviceDuration, clientPrice, servicePrice]);
 
@@ -254,20 +254,22 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
     try {
       if (isRecurring && recurrenceEndDate) {
         // Create recurrence
-        const startDate = new Date(startTime);
-        // Convert end date to datetime by combining with the start time
-        const endDate = new Date(recurrenceEndDate + 'T' + startDate.toTimeString().slice(0, 5));
+        // Convert local times to UTC for start_date and end_date
+        const startDateUTC = localDateTimeToUTCISOString(startTime);
+        const endDateUTC = localDateTimeToUTCISOString(recurrenceEndDate + 'T' + new Date(startTime).toTimeString().slice(0, 5));
 
-        // Extract time components
-        const startTimeOnly = startDate.toTimeString().slice(0, 5); // HH:mm
-        const endTimeOnly = new Date(endTime).toTimeString().slice(0, 5); // HH:mm
+        // Extract time components in UTC
+        const startDate = new Date(startTime);
+        const endDate = new Date(endTime);
+        const startTimeOnly = startDate.getUTCHours().toString().padStart(2, '0') + ':' + startDate.getUTCMinutes().toString().padStart(2, '0'); // HH:mm in UTC
+        const endTimeOnly = endDate.getUTCHours().toString().padStart(2, '0') + ':' + endDate.getUTCMinutes().toString().padStart(2, '0'); // HH:mm in UTC
 
         await apiClient.createRecurrence({
           service_id: serviceId,
           client_id: clientId,
           frequency: recurrenceFrequency,
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
+          start_date: startDateUTC,
+          end_date: endDateUTC,
           title,
           start_time: startTimeOnly,
           end_time: endTimeOnly,
@@ -407,9 +409,9 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
                     <FormControl isRequired={isRecurring}>
                       <FormLabel>Frequency</FormLabel>
                       <Select value={recurrenceFrequency} onChange={e => setRecurrenceFrequency(e.target.value as any)}>
-                        <option value="weekly">Weekly</option>
-                        <option value="biweekly">Bi-weekly</option>
-                        <option value="monthly">Monthly</option>
+                        <option value="WEEKLY">Weekly</option>
+                        <option value="BIWEEKLY">Bi-weekly</option>
+                        <option value="MONTHLY">Monthly</option>
                       </Select>
                     </FormControl>
 

@@ -159,17 +159,17 @@ const Stats: React.FC = () => {
           switch (period) {
             case 'last7days':
               startDateLocal = new Date(today);
-              startDateLocal.setDate(today.getDate() - 7);
+              startDateLocal.setDate(today.getDate() - 6); // Changed from -7 to -6 to get exactly 7 days
               startDateLocal.setHours(0, 0, 0, 0);
               break;
             case 'last30days':
               startDateLocal = new Date(today);
-              startDateLocal.setDate(today.getDate() - 30);
+              startDateLocal.setDate(today.getDate() - 29); // Changed from -30 to -29 to get exactly 30 days
               startDateLocal.setHours(0, 0, 0, 0);
               break;
             case 'last90days':
               startDateLocal = new Date(today);
-              startDateLocal.setDate(today.getDate() - 90);
+              startDateLocal.setDate(today.getDate() - 89); // Changed from -90 to -89 to get exactly 90 days
               startDateLocal.setHours(0, 0, 0, 0);
               break;
             case 'thisMonth':

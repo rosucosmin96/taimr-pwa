@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, String, Text
+from sqlalchemy import Boolean, Column, String, Text
 from sqlalchemy.orm import relationship
 
 from .base import Base, TimestampMixin
@@ -16,6 +16,7 @@ class User(Base, TimestampMixin):
     email = Column(String(255), unique=True, nullable=False, index=True)
     name = Column(String(255), nullable=False)
     profile_picture_url = Column(Text, nullable=True)
+    tutorial_checked = Column(Boolean, nullable=False, default=False)
 
     # Relationships
     services = relationship(

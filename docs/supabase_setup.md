@@ -221,7 +221,7 @@ CREATE TABLE public.recurrences (
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
     service_id UUID REFERENCES public.services(id) ON DELETE CASCADE NOT NULL,
     client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE NOT NULL,
-    frequency TEXT CHECK (frequency IN ('weekly', 'biweekly', 'monthly')) NOT NULL,
+    frequency TEXT CHECK (frequency IN ('WEEKLY', 'BIWEEKLY', 'MONTHLY')) NOT NULL,
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
     end_date TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

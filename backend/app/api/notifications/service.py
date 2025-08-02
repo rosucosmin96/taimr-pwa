@@ -1,13 +1,13 @@
+import logging
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_
-from sqlalchemy.orm import Session
-
-from app.api.commons.shared import ensure_utc
 from app.api.notifications.model import (
     NotificationResponse,
     NotificationUpdateRequest,
+)
+from app.models import (
+    Client as ClientModel,
 )
 from app.models import (
     Meeting as MeetingModel,
@@ -19,25 +19,53 @@ from app.models import (
     Notification as NotificationModel,
 )
 from app.models.notification import NotificationType
+from app.storage.factory import StorageFactory
+
+logger = logging.getLogger(__name__)
 
 
 class NotificationService:
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self):
+        self.storage = StorageFactory.create_storage_service(
+            model_class=NotificationModel,
+            response_class=NotificationResponse,
+            table_name="notifications",
+        )
+        # Create separate storage for memberships, meetings, and clients (needed for business logic)
+        self.membership_storage = StorageFactory.create_storage_service(
+            model_class=MembershipModel,
+            response_class=None,  # We'll handle responses manually
+            table_name="memberships",
+        )
+        self.meeting_storage = StorageFactory.create_storage_service(
+            model_class=MeetingModel,
+            response_class=None,  # We'll handle responses manually
+            table_name="meetings",
+        )
+        self.client_storage = StorageFactory.create_storage_service(
+            model_class=ClientModel,
+            response_class=None,  # We'll handle responses manually
+            table_name="clients",
+        )
 
     async def get_notifications(
         self, user_id: UUID, unread_only: bool = False
     ) -> list[NotificationResponse]:
         """Get notifications for a user, optionally filtered to unread only"""
-        query = self.db.query(NotificationModel).filter(
-            NotificationModel.user_id == str(user_id)
-        )
-
+        filters = {}
         if unread_only:
-            query = query.filter(not NotificationModel.read)
+            filters["read"] = False
 
-        notifications = query.order_by(NotificationModel.created_at.desc()).all()
-        return [self._to_response(notification) for notification in notifications]
+        notifications = await self.storage.get_all(user_id, filters)
+        # Sort by created_at descending (newest first)
+        notifications.sort(key=lambda x: x.created_at, reverse=True)
+        return notifications
+
+    async def get_notification(
+        self, user_id: UUID, notification_id: UUID
+    ) -> NotificationResponse | None:
+        """Get a specific notification by ID"""
+        return await self.storage.get_by_id(user_id, notification_id)
 
     async def create_notification(
         self,
@@ -51,37 +79,30 @@ class NotificationService:
         """Create a new notification"""
 
         # Check if notification already exists
-        existing_notification = (
-            self.db.query(NotificationModel)
-            .filter(
-                and_(
-                    NotificationModel.user_id == str(user_id),
-                    NotificationModel.related_entity_id == str(related_entity_id),
-                    NotificationModel.related_entity_type == related_entity_type,
-                )
-            )
-            .first()
+        existing_notifications = await self.storage.get_all(
+            user_id,
+            {
+                "related_entity_id": (
+                    str(related_entity_id) if related_entity_id else None
+                ),
+                "related_entity_type": related_entity_type,
+            },
         )
 
-        if existing_notification:
-            return self._to_response(existing_notification)
+        if existing_notifications:
+            return existing_notifications[0]
 
-        db_notification = NotificationModel(
-            id=str(uuid4()),
-            user_id=str(user_id),
-            type=notification_type,
-            title=title,
-            message=message,
-            related_entity_id=str(related_entity_id) if related_entity_id else None,
-            related_entity_type=related_entity_type,
-            read=False,
-        )
+        notification_data = {
+            "id": str(uuid4()),
+            "type": notification_type,
+            "title": title,
+            "message": message,
+            "related_entity_id": str(related_entity_id) if related_entity_id else None,
+            "related_entity_type": related_entity_type,
+            "read": False,
+        }
 
-        self.db.add(db_notification)
-        self.db.commit()
-        self.db.refresh(db_notification)
-
-        return self._to_response(db_notification)
+        return await self.storage.create(user_id, notification_data)
 
     async def update_notification(
         self,
@@ -90,124 +111,99 @@ class NotificationService:
         update_data: NotificationUpdateRequest,
     ) -> NotificationResponse:
         """Update a notification"""
-        db_notification = (
-            self.db.query(NotificationModel)
-            .filter(
-                and_(
-                    NotificationModel.id == str(notification_id),
-                    NotificationModel.user_id == str(user_id),
-                )
-            )
-            .first()
-        )
-
-        if not db_notification:
+        # First check if notification exists
+        existing_notification = await self.storage.get_by_id(user_id, notification_id)
+        if not existing_notification:
             raise ValueError("Notification not found")
 
+        # Prepare update data
+        update_fields = {}
         if update_data.read is not None:
-            db_notification.read = update_data.read
+            update_fields["read"] = update_data.read
             if update_data.read:
-                db_notification.read_at = ensure_utc(datetime.now())
+                update_fields["read_at"] = datetime.now()
             else:
-                db_notification.read_at = None
+                update_fields["read_at"] = None
 
-        self.db.commit()
-        self.db.refresh(db_notification)
+        updated_notification = await self.storage.update(
+            user_id, notification_id, update_fields
+        )
+        if not updated_notification:
+            raise ValueError("Failed to update notification")
 
-        return self._to_response(db_notification)
+        return updated_notification
 
     async def mark_notifications_read(
         self, user_id: UUID, notification_ids: list[UUID]
     ) -> list[NotificationResponse]:
         """Mark multiple notifications as read"""
-        notifications = (
-            self.db.query(NotificationModel)
-            .filter(
-                and_(
-                    NotificationModel.user_id == str(user_id),
-                    NotificationModel.id.in_([str(nid) for nid in notification_ids]),
-                )
-            )
-            .all()
-        )
-
         updated_notifications = []
-        for notification in notifications:
-            notification.read = True
-            notification.read_at = ensure_utc(datetime.now())
-            updated_notifications.append(notification)
 
-        self.db.commit()
+        for notification_id in notification_ids:
+            try:
+                updated_notification = await self.update_notification(
+                    user_id, notification_id, NotificationUpdateRequest(read=True)
+                )
+                updated_notifications.append(updated_notification)
+            except ValueError:
+                # Skip notifications that don't exist or don't belong to user
+                continue
 
-        return [
-            self._to_response(notification) for notification in updated_notifications
-        ]
+        return updated_notifications
 
     async def delete_notification(self, user_id: UUID, notification_id: UUID) -> None:
         """Delete a notification"""
-        db_notification = (
-            self.db.query(NotificationModel)
-            .filter(
-                and_(
-                    NotificationModel.id == str(notification_id),
-                    NotificationModel.user_id == str(user_id),
-                )
-            )
-            .first()
-        )
-
-        if not db_notification:
+        # Check if notification exists
+        existing_notification = await self.storage.get_by_id(user_id, notification_id)
+        if not existing_notification:
             raise ValueError("Notification not found")
 
-        self.db.delete(db_notification)
-        self.db.commit()
+        success = await self.storage.delete(user_id, notification_id)
+        if not success:
+            raise ValueError("Failed to delete notification")
 
     async def check_membership_expiration_warnings(self, user_id: UUID) -> None:
         """Check for membership expiration warnings and create notifications"""
         # Get active memberships
-        active_memberships = (
-            self.db.query(MembershipModel)
-            .filter(
-                and_(
-                    MembershipModel.user_id == str(user_id),
-                    MembershipModel.status == "active",
-                )
-            )
-            .all()
+        active_memberships = await self.membership_storage.get_all(
+            user_id, {"status": "active"}
         )
 
         for membership in active_memberships:
             await self._check_single_membership_expiration(membership)
 
-    async def _check_single_membership_expiration(
-        self, membership: MembershipModel
-    ) -> None:
+    async def _check_single_membership_expiration(self, membership: dict) -> None:
         """Check if a single membership is about to expire and create notification if needed"""
         # Check if we already have a recent notification for this membership
-        recent_notification = (
-            self.db.query(NotificationModel)
-            .filter(
-                and_(
-                    NotificationModel.user_id == membership.user_id,
-                    NotificationModel.type
-                    == NotificationType.MEMBERSHIP_EXPIRING.value,
-                    NotificationModel.related_entity_id == membership.id,
-                    NotificationModel.created_at >= datetime.now() - timedelta(days=1),
-                )
-            )
-            .first()
+        recent_notifications = await self.storage.get_all(
+            UUID(membership["user_id"]),
+            {
+                "type": NotificationType.MEMBERSHIP_EXPIRING.value,
+                "related_entity_id": membership["id"],
+            },
         )
 
-        if recent_notification:
+        # Filter for notifications created in the last day
+        recent_notifications = [
+            n
+            for n in recent_notifications
+            if n.created_at >= datetime.now() - timedelta(days=1)
+        ]
+
+        if recent_notifications:
             return  # Already notified recently
 
         should_notify = False
         days_until_expiry = None
 
         # Check time-based expiration
-        if membership.start_date:
-            expiration_date = membership.start_date + timedelta(
-                days=membership.availability_days
+        if membership.get("start_date"):
+            start_date = membership["start_date"]
+            if isinstance(start_date, str):
+                start_date = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+
+            expiration_date = start_date + timedelta(
+                days=membership["availability_days"]
             )
             days_until_expiry = (expiration_date - datetime.now()).days
 
@@ -216,64 +212,50 @@ class NotificationService:
 
         # Check meeting count-based expiration
         if not should_notify:
-            done_meetings_count = (
-                self.db.query(MeetingModel)
-                .filter(
-                    and_(
-                        MeetingModel.membership_id == membership.id,
-                        MeetingModel.status == "done",
-                    )
-                )
-                .count()
+            done_meetings = await self.meeting_storage.get_all(
+                UUID(membership["user_id"]),
+                {"membership_id": membership["id"], "status": "done"},
             )
 
-            remaining_meetings = membership.total_meetings - done_meetings_count
+            done_meetings_count = len(done_meetings)
+            remaining_meetings = membership["total_meetings"] - done_meetings_count
             if remaining_meetings == 1:
                 should_notify = True
                 days_until_expiry = 0  # Last meeting
 
         if should_notify:
             # Get client name for the notification
-            from app.models import Client as ClientModel
-
-            client = (
-                self.db.query(ClientModel)
-                .filter(ClientModel.id == membership.client_id)
-                .first()
+            client_name = await self._get_client_name(
+                UUID(membership["user_id"]), UUID(membership["client_id"])
             )
-            client_name = client.name if client else "Unknown Client"
 
             # Create notification
             title = "Membership Expiring Soon"
             if days_until_expiry == 0:
-                message = f"'{membership.name}' for {client_name} has only 1 meeting remaining."
+                message = f"'{membership['name']}' for {client_name} has only 1 meeting remaining."
             else:
-                message = f"'{membership.name}' for {client_name} expires in {days_until_expiry} days."
+                message = f"'{membership['name']}' for {client_name} expires in {days_until_expiry} days."
 
             await self.create_notification(
-                user_id=UUID(membership.user_id),
+                user_id=UUID(membership["user_id"]),
                 notification_type=NotificationType.MEMBERSHIP_EXPIRING.value,
                 title=title,
                 message=message,
-                related_entity_id=UUID(membership.id),
+                related_entity_id=UUID(membership["id"]),
                 related_entity_type="membership",
             )
 
-    def _to_response(self, notification: NotificationModel) -> NotificationResponse:
-        """Convert database model to response model"""
-        return NotificationResponse(
-            id=UUID(notification.id),
-            user_id=UUID(notification.user_id),
-            type=notification.type,
-            title=notification.title,
-            message=notification.message,
-            related_entity_id=(
-                UUID(notification.related_entity_id)
-                if notification.related_entity_id
-                else None
-            ),
-            related_entity_type=notification.related_entity_type,
-            read=notification.read,
-            read_at=ensure_utc(notification.read_at) if notification.read_at else None,
-            created_at=ensure_utc(notification.created_at),
-        )
+    async def _get_client_name(self, user_id: UUID, client_id: UUID) -> str:
+        """Get client name by ID"""
+        try:
+            client = await self.client_storage.get_by_id(user_id, client_id)
+            if client:
+                return client.get("name", "Unknown Client")
+            return "Unknown Client"
+        except Exception as e:
+            logger.warning(f"Failed to get client name for client {client_id}: {e}")
+            return "Unknown Client"
+
+    async def notification_exists(self, user_id: UUID, notification_id: UUID) -> bool:
+        """Check if a notification exists"""
+        return await self.storage.exists(user_id, notification_id)

@@ -1,85 +1,106 @@
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy.orm import Session
 
 from app.api.profile.model import ProfileUpdateRequest
 from app.api.profile.service import ProfileService
-from app.database.factory import DatabaseFactory
 from app.models import User
+from app.storage.factory import StorageFactory
 
 
 class TestProfileService:
-    """Test cases for ProfileService with database operations."""
+    """Test cases for ProfileService with storage operations."""
 
     @pytest.fixture
-    def db_session(self):
-        """Create a test database session."""
-        db_provider = DatabaseFactory.create_provider(":memory:")
-        db_provider.create_tables()
-        session = db_provider.get_session()
-        yield session
-        session.close()
-
-    @pytest.fixture
-    def test_user(self, db_session: Session):
-        """Create a test user."""
-        user = User(
-            id=str(uuid4()),
-            email="test@example.com",
-            name="Test User",
-            profile_picture_url="https://example.com/old.jpg",
-        )
-        db_session.add(user)
-        db_session.commit()
-        return user
-
-    @pytest.fixture
-    def profile_service(self, db_session: Session):
+    def profile_service(self):
         """Create a ProfileService instance."""
-        return ProfileService(db_session)
+        return ProfileService()
 
-    async def test_get_profile(self, profile_service, test_user):
-        """Test getting user profile."""
-        result = await profile_service.get_profile(UUID(test_user.id))
+    @pytest.fixture
+    def test_user_id(self):
+        """Create a test user ID."""
+        return UUID(uuid4())
 
-        assert result.id == UUID(test_user.id)
-        assert result.email == "test@example.com"
-        assert result.name == "Test User"
-        assert result.profile_picture_url == "https://example.com/old.jpg"
-
-    async def test_update_profile(self, profile_service, test_user):
-        """Test updating user profile."""
-        update_data = ProfileUpdateRequest(
-            name="Updated Name", profile_picture_url="https://example.com/new.jpg"
+    @pytest.fixture
+    async def setup_test_data(self, test_user_id):
+        """Setup test data using storage."""
+        # Create test user
+        user_storage = StorageFactory.create_storage_service(
+            model_class=User, response_class=None, table_name="users"
         )
 
-        result = await profile_service.update_profile(UUID(test_user.id), update_data)
+        user_data = {
+            "id": str(test_user_id),
+            "email": "test@example.com",
+            "name": "Test User",
+            "profile_picture_url": None,
+            "tutorial_checked": False,
+        }
+        await user_storage.create(test_user_id, user_data)
 
-        assert result.name == "Updated Name"
-        assert result.profile_picture_url == "https://example.com/new.jpg"
+    async def test_get_profile_existing_user(
+        self, profile_service, test_user_id, setup_test_data
+    ):
+        """Test getting profile for an existing user."""
+        profile = await profile_service.get_profile(test_user_id, "test@example.com")
 
-    async def test_update_profile_partial(self, profile_service, test_user):
-        """Test updating only some profile fields."""
-        update_data = ProfileUpdateRequest(name="Updated Name")
+        assert profile.id == str(test_user_id)
+        assert profile.email == "test@example.com"
+        assert profile.name == "Test User"
+        assert profile.profile_picture_url is None
+        assert profile.tutorial_checked is False
 
-        result = await profile_service.update_profile(UUID(test_user.id), update_data)
+    async def test_get_profile_new_user(self, profile_service, test_user_id):
+        """Test getting profile for a new user (should create profile)."""
+        profile = await profile_service.get_profile(test_user_id, "newuser@example.com")
 
-        assert result.name == "Updated Name"
-        assert result.profile_picture_url == "https://example.com/old.jpg"  # Unchanged
+        assert profile.id == str(test_user_id)
+        assert profile.email == "newuser@example.com"
+        assert profile.name == "newuser"  # Extracted from email
+        assert profile.profile_picture_url is None
+        assert profile.tutorial_checked is False
 
-    async def test_user_not_found(self, profile_service):
-        """Test handling of non-existent user."""
-        non_existent_id = uuid4()
+    async def test_update_profile(self, profile_service, test_user_id, setup_test_data):
+        """Test updating a profile."""
+        update_data = ProfileUpdateRequest(
+            name="Updated Name",
+            profile_picture_url="https://example.com/avatar.jpg",
+            tutorial_checked=True,
+        )
 
-        with pytest.raises(ValueError, match="User not found"):
-            await profile_service.get_profile(non_existent_id)
+        updated_profile = await profile_service.update_profile(
+            test_user_id, update_data, "test@example.com"
+        )
 
-    async def test_update_nonexistent_user(self, profile_service):
-        """Test updating a non-existent user."""
-        non_existent_id = uuid4()
+        assert updated_profile.name == "Updated Name"
+        assert updated_profile.profile_picture_url == "https://example.com/avatar.jpg"
+        assert updated_profile.tutorial_checked is True
 
-        with pytest.raises(ValueError, match="User not found"):
-            await profile_service.update_profile(
-                non_existent_id, ProfileUpdateRequest(name="Updated")
-            )
+    async def test_update_profile_partial(
+        self, profile_service, test_user_id, setup_test_data
+    ):
+        """Test updating a profile with partial data."""
+        update_data = ProfileUpdateRequest(
+            name="Partial Update",
+            profile_picture_url=None,
+            tutorial_checked=None,
+        )
+
+        updated_profile = await profile_service.update_profile(
+            test_user_id, update_data, "test@example.com"
+        )
+
+        assert updated_profile.name == "Partial Update"
+        # Other fields should remain unchanged
+        assert updated_profile.profile_picture_url is None
+        assert updated_profile.tutorial_checked is False
+
+    async def test_profile_exists(self, profile_service, test_user_id, setup_test_data):
+        """Test checking if profile exists."""
+        exists = await profile_service.profile_exists(test_user_id)
+        assert exists is True
+
+    async def test_profile_not_exists(self, profile_service, test_user_id):
+        """Test checking if profile exists for non-existent user."""
+        exists = await profile_service.profile_exists(test_user_id)
+        assert exists is False

@@ -627,10 +627,6 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 # Environment Configuration
 ENVIRONMENT=dev  # Set to "prod" for production
 
-# Test Data Configuration
-CREATE_TEST_DATA=false  # Set to "true" for development with test data
-# WARNING: Never set CREATE_TEST_DATA=true in production
-
 # Database Configuration
 LOCAL_ENVIRONMENT=false
 
@@ -659,7 +655,6 @@ For development, you can automatically create test data on startup:
 1. **Enable test data creation:**
    ```bash
    # In your .env file
-   CREATE_TEST_DATA=true
    ENVIRONMENT=dev
    ```
 
@@ -677,7 +672,6 @@ The server will automatically create:
 **Important Notes:**
 - Test data is only created in development environment (`ENVIRONMENT=dev`)
 - Test data creation is idempotent - safe to run multiple times
-- Test data is never created in production, even if `CREATE_TEST_DATA=true`
 - You can also manually create test data using: `python init_test_data.py`
 
 ## 📝 Notes
