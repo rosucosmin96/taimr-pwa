@@ -71,8 +71,8 @@ const Calendar: React.FC = () => {
   }
 
   return (
-    <Stack spacing={8} px={{ base: 2, md: 8 }} py={4}>
-      <Heading as="h1" size="lg" mb={4}>Calendar</Heading>
+    <Stack spacing={8} px={{ base: 2, md: 8 }} py={4} className="container-responsive">
+      <Heading as="h1" size="lg" mb={4} className="responsive-heading">Calendar</Heading>
 
       <FullCalendar
         meetings={meetings}

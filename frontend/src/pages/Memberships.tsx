@@ -180,11 +180,11 @@ const Memberships: React.FC = () => {
   };
 
   return (
-    <ChakraStack spacing={8} px={{ base: 2, md: 8 }} py={4}>
-      <Heading as="h1" size="lg" mb={4}>Memberships</Heading>
+    <ChakraStack spacing={8} px={{ base: 2, md: 8 }} py={4} className="container-responsive">
+      <Heading as="h1" size="lg" mb={4} className="responsive-heading">Memberships</Heading>
       {/* Search and Filter Bar */}
-      <Flex gap={4} align="center" flexWrap="wrap">
-        <InputGroup maxW="400px">
+      <Flex gap={4} align="center" flexWrap="wrap" className="mobile-spacing">
+        <InputGroup maxW={{ base: "100%", sm: "400px" }} minW={{ base: "200px", sm: "auto" }}>
           <InputLeftElement pointerEvents="none">
             <MagnifyingGlassIcon style={{ width: 20, height: 20, color: '#718096' }} />
           </InputLeftElement>
@@ -193,6 +193,7 @@ const Memberships: React.FC = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             borderRadius="lg"
+            className="responsive-text"
           />
         </InputGroup>
         <Popover isOpen={isFilterOpen} onClose={onFilterClose}>

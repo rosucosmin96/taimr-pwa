@@ -447,17 +447,17 @@ const Stats: React.FC = () => {
     <ResponsiveContentWrapper>
       {(maxWidth) => (
         <Stack spacing={{ base: 4, md: 8 }} px={{ base: 1, sm: 2, md: 8 }} py={{ base: 2, md: 4 }} w="full" maxW={maxWidth} minW={0} overflowX="hidden">
-          <Heading as="h1" size={{ base: "md", md: "lg" }} mb={4} textAlign={{ base: "center", md: "left" }}>Statistics</Heading>
+          <Heading as="h1" size={{ base: "md", md: "lg" }} mb={4} textAlign={{ base: "center", md: "left" }} className="responsive-heading">Statistics</Heading>
 
           {/* Period and Service Selectors */}
-          <Box w="full" maxW={maxWidth} minW={0}>
-            <Flex wrap="wrap" gap={3} direction={{ base: 'column', sm: 'row' }} align="start" w="full" minW={0}>
+          <Box w="full" maxW={maxWidth} minW={0} className="responsive-container">
+            <Flex wrap="wrap" gap={3} direction={{ base: 'column', sm: 'row' }} align="start" w="full" minW={0} className="mobile-spacing">
               {/* Period Selector */}
               <Select
                 value={period}
                 onChange={(e) => setPeriod(e.target.value)}
-                maxW={220}
-                minW={120}
+                maxW={{ base: "100%", sm: 220 }}
+                minW={{ base: "200px", sm: 120 }}
                 flexShrink={1}
                 bg="white"
                 size={{ base: "md", md: "sm" }}
@@ -466,6 +466,7 @@ const Stats: React.FC = () => {
                 borderColor="gray.200"
                 _focus={{ borderColor: "purple.500", boxShadow: "0 0 0 1px var(--chakra-colors-purple-500)" }}
                 fontSize={{ base: "sm", md: "md" }}
+                className="responsive-text"
               >
                 <option value="allTime">All Time</option>
                 <option value="last7days">Last 7 Days</option>
@@ -481,8 +482,8 @@ const Stats: React.FC = () => {
                 <Select
                   value={selectedService}
                   onChange={(e) => setSelectedService(e.target.value)}
-                  maxW={220}
-                  minW={120}
+                  maxW={{ base: "100%", sm: 220 }}
+                  minW={{ base: "200px", sm: 120 }}
                   flexShrink={1}
                   bg="white"
                   size={{ base: "md", md: "sm" }}
@@ -491,6 +492,7 @@ const Stats: React.FC = () => {
                   borderColor="gray.200"
                   _focus={{ borderColor: "purple.500", boxShadow: "0 0 0 1px var(--chakra-colors-purple-500)" }}
                   fontSize={{ base: "sm", md: "md" }}
+                  className="responsive-text"
                 >
                   <option value="all">All Services</option>
                   {services.map((service) => (

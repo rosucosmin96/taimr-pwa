@@ -182,7 +182,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     <Flex minH="100vh" bg="gray.50">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} />
       <Flex direction="column" flex="1" ml={{ base: 0, md: '64' }}>
-        {/* Top nav for mobile */}
+        {/* Top nav for mobile - Sticky Header */}
         <Flex
           as="header"
           display={{ base: 'flex', md: 'none' }}
@@ -191,6 +191,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           py={3}
           bg="white"
           boxShadow="sm"
+          position="sticky"
+          top={0}
+          zIndex={1000}
+          className="sticky-header"
         >
           <IconButton
             aria-label="Open menu"
@@ -198,7 +202,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             variant="ghost"
             onClick={() => setSidebarOpen(true)}
           />
-          <Text ml={4} fontWeight="bold" fontSize="lg">
+          <Text ml={4} fontWeight="bold" fontSize={{ base: "lg", sm: "xl" }} className="responsive-heading">
             taimr
           </Text>
         </Flex>

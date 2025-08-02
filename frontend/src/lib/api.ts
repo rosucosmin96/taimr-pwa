@@ -1,6 +1,7 @@
 // API service layer for backend communication
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+console.log("API_BASE_URL:", API_BASE_URL);
 
 // Types based on backend models
 export interface Service {
