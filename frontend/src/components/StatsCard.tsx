@@ -9,23 +9,44 @@ interface StatsCardProps {
 }
 
 const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, color = 'gray.100' }) => (
-  <Box bg={color} borderRadius="xl" boxShadow="sm" p={4}>
-    <Flex align="center">
+  <Box bg={color} borderRadius="xl" boxShadow="sm" p={4} className="responsive-container">
+    <Flex align="center" minW={0}>
       {icon && (
         <Flex
           align="center"
           justify="center"
-          boxSize={12}
+          boxSize={{ base: 10, sm: 12 }}
           bg="whiteAlpha.800"
           borderRadius="full"
-          mr={4}
+          mr={{ base: 3, sm: 4 }}
+          flexShrink={0}
         >
           {icon}
         </Flex>
       )}
-      <Box>
-        <Text fontSize="sm" color="gray.500" fontWeight="medium">{title}</Text>
-        <Text fontSize="2xl" fontWeight="bold" color="gray.900">{value}</Text>
+      <Box minW={0} flex={1}>
+        <Text
+          fontSize={{ base: "xs", sm: "sm" }}
+          color="gray.500"
+          fontWeight="medium"
+          className="responsive-label"
+          noOfLines={2}
+          overflow="hidden"
+          textOverflow="ellipsis"
+        >
+          {title}
+        </Text>
+        <Text
+          fontSize={{ base: "lg", sm: "2xl" }}
+          fontWeight="bold"
+          color="gray.900"
+          className="responsive-text"
+          noOfLines={1}
+          overflow="hidden"
+          textOverflow="ellipsis"
+        >
+          {value}
+        </Text>
       </Box>
     </Flex>
   </Box>

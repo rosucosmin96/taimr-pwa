@@ -300,43 +300,47 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
   }, [isDatePickerOpen, currentDate]);
 
   return (
-    <Box bg="white" rounded="xl" shadow="md" p={6} minW="360px" maxW="100%">
+    <Box bg="white" rounded="xl" shadow="md" p={{ base: 3, md: 6 }} minW={0} maxW="100%" className="responsive-container">
       {/* Responsive Header with navigation */}
       <VStack spacing={4} mb={4} align="stretch">
         {/* New Meeting button always on top, full width */}
         <Button
-          size="sm"
+          size={{ base: "sm", md: "sm" }}
           colorScheme="purple"
-          leftIcon={<PlusIcon style={{ width: 18, height: 18 }} />}
+          leftIcon={<PlusIcon style={{ width: 16, height: 16 }} />}
           onClick={onAddMeeting}
           width="100%"
+          className="responsive-text"
         >
           New Meeting
         </Button>
         {/* Navigation buttons - always below New Meeting, centered */}
-        <Flex width="100%" justify="center">
-          <HStack spacing={2}>
+        <Flex width="100%" justify="center" className="responsive-container">
+          <HStack spacing={{ base: 1, md: 2 }} flexWrap="wrap" justify="center">
             <Button
-              size="sm"
+              size={{ base: "xs", md: "sm" }}
               variant="outline"
               onClick={goToPrevious}
-              leftIcon={<ChevronLeftIcon style={{ width: 16, height: 16 }} />}
+              leftIcon={<ChevronLeftIcon style={{ width: 14, height: 14 }} />}
+              className="responsive-text"
             >
               {isWeekView ? 'Previous Week' : 'Previous Day'}
             </Button>
             <Button
-              size="sm"
+              size={{ base: "xs", md: "sm" }}
               variant="outline"
               onClick={goToNext}
-              rightIcon={<ChevronRightIcon style={{ width: 16, height: 16 }} />}
+              rightIcon={<ChevronRightIcon style={{ width: 14, height: 14 }} />}
+              className="responsive-text"
             >
               {isWeekView ? 'Next Week' : 'Next Day'}
             </Button>
             <Button
-              size="sm"
+              size={{ base: "xs", md: "sm" }}
               variant="outline"
               onClick={resetToToday}
-              leftIcon={<CalendarIcon style={{ width: 16, height: 16 }} />}
+              leftIcon={<CalendarIcon style={{ width: 14, height: 14 }} />}
+              className="responsive-text"
             >
               {isWeekView ? 'This Week' : 'Today'}
             </Button>
@@ -441,8 +445,8 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
       </VStack>
       {/* Day headers - only for week view */}
       {isWeekView && (
-        <Flex mb={2}>
-          <Box width="80px" flexShrink={0} />
+        <Flex mb={2} className="responsive-container">
+          <Box width={{ base: "60px", md: "80px" }} flexShrink={0} />
           {days.map((day, index) => (
             <Box
               key={index}
@@ -454,9 +458,10 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
               fontWeight={day.isToday ? 'bold' : 'normal'}
               rounded="md"
               mx={1}
+              minW={0}
             >
-              <Text fontSize="xs" fontWeight="medium">{day.label}</Text>
-              <Text fontSize="lg" fontWeight="bold">{day.date.getDate()}</Text>
+              <Text fontSize={{ base: "2xs", md: "xs" }} fontWeight="medium" className="responsive-text">{day.label}</Text>
+              <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" className="responsive-text">{day.date.getDate()}</Text>
             </Box>
           ))}
         </Flex>
@@ -468,8 +473,10 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
         position="relative"
         height={VISIBLE_HEIGHT + 'px'}
         overflowY="auto"
+        overflowX="hidden"
         bg="gray.50"
         rounded="lg"
+        className="calendar-container"
       >
         {/* Background grid: horizontal lines for each hour interval */}
         <Box
@@ -508,7 +515,7 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
         {/* Time grid and day columns */}
         <Flex position="relative" height={contentHeight + 'px'} zIndex={2}>
           {/* Time labels */}
-          <VStack spacing={0} align="stretch" height={contentHeight + 'px'} position="relative" width="80px" flexShrink={0}>
+          <VStack spacing={0} align="stretch" height={contentHeight + 'px'} position="relative" width={{ base: "60px", md: "80px" }} flexShrink={0}>
             {timeSlots.map((slot, index) => (
               <Box
                 key={index}
@@ -520,11 +527,12 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
                 {slot.minute === 0 && (
                   <Text
                     position="absolute"
-                    left="8px"
+                    left={{ base: "4px", md: "8px" }}
                     top="2px"
-                    fontSize="xs"
+                    fontSize={{ base: "2xs", md: "xs" }}
                     color="gray.500"
                     fontWeight="medium"
+                    className="responsive-text"
                   >
                     {formatTime(slot.hour, slot.minute)}
                   </Text>
@@ -566,7 +574,7 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
                       height={height + 'px'}
                       bg={getMeetingColor(meeting.status)}
                       rounded="md"
-                      p={2}
+                      p={{ base: 1, md: 2 }}
                       boxShadow="sm"
                       zIndex={5}
                       minHeight={SLOT_HEIGHT + 'px'}
@@ -575,12 +583,29 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
                       transition="all 0.2s"
                       onClick={() => onViewMeeting?.(meeting)}
                       overflow="hidden"
+                      className="meeting-block"
                     >
-                      <VStack spacing={1} align="start">
-                        <Text fontSize="xs" fontWeight="semibold" color="white">
+                      <VStack spacing={{ base: 0.5, md: 1 }} align="start" h="full" justify="start">
+                        <Text
+                          fontSize={{ base: "2xs", md: "xs" }}
+                          fontWeight="semibold"
+                          color="white"
+                          noOfLines={1}
+                          overflow="hidden"
+                          textOverflow="ellipsis"
+                          className="responsive-text"
+                        >
                           {meeting.title || 'Meeting'}
                         </Text>
-                        <Text fontSize="xs" color="white" opacity={0.9}>
+                        <Text
+                          fontSize={{ base: "2xs", md: "xs" }}
+                          color="white"
+                          opacity={0.9}
+                          noOfLines={1}
+                          overflow="hidden"
+                          textOverflow="ellipsis"
+                          className="responsive-text"
+                        >
                           {meetingDate.toLocaleTimeString('en-US', {
                             hour: 'numeric',
                             minute: '2-digit',
@@ -591,7 +616,15 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
                             hour12: true
                           })}
                         </Text>
-                        <Text fontSize="xs" color="white" opacity={0.8}>
+                        <Text
+                          fontSize={{ base: "2xs", md: "xs" }}
+                          color="white"
+                          opacity={0.8}
+                          noOfLines={1}
+                          overflow="hidden"
+                          textOverflow="ellipsis"
+                          className="responsive-text"
+                        >
                           ${meeting.price_total.toFixed(2)}
                         </Text>
                       </VStack>

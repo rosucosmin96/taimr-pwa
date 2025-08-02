@@ -50,6 +50,11 @@ const Clients: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+
+  // Debug modal state
+  useEffect(() => {
+    console.log('Modal state changed:', { isViewModalOpen, selectedClient });
+  }, [isViewModalOpen, selectedClient]);
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
 
   // Filter states
@@ -220,8 +225,10 @@ const Clients: React.FC = () => {
   };
 
   const handleClientClick = (client: Client) => {
+    console.log('Client clicked:', client.name); // Debug log
     setSelectedClient(client);
     setIsViewModalOpen(true);
+    console.log('Modal should open, selectedClient:', client, 'isViewModalOpen:', true);
   };
 
   const handleModalSuccess = () => {
@@ -283,12 +290,12 @@ const Clients: React.FC = () => {
   }
 
   return (
-    <Stack spacing={8} px={{ base: 2, md: 8 }} py={4}>
-      <Heading as="h1" size="lg" mb={4}>Clients</Heading>
+    <Stack spacing={8} px={{ base: 2, md: 8 }} py={4} className="container-responsive">
+      <Heading as="h1" size="lg" mb={4} className="responsive-heading">Clients</Heading>
 
       {/* Search and Filter Bar */}
-      <Flex gap={4} align="center" flexWrap="wrap">
-        <InputGroup maxW="400px">
+      <Flex gap={4} align="center" flexWrap="wrap" className="mobile-spacing">
+        <InputGroup maxW={{ base: "100%", sm: "400px" }} minW={{ base: "200px", sm: "auto" }}>
           <InputLeftElement pointerEvents="none">
             <MagnifyingGlassIcon style={{ width: 20, height: 20, color: '#718096' }} />
           </InputLeftElement>
@@ -297,6 +304,7 @@ const Clients: React.FC = () => {
             value={filters.search}
             onChange={(e) => handleSearchChange(e.target.value)}
             borderRadius="lg"
+            className="responsive-text"
           />
         </InputGroup>
 
@@ -417,18 +425,50 @@ const Clients: React.FC = () => {
         </Flex>
         <Stack divider={<Box borderBottomWidth={1} borderColor="gray.100" />}>
           {filteredClients.map((client) => (
-            <Flex
+            <Box
               key={client.id}
-              align="center"
-              justify="space-between"
-              py={4}
+              as="button"
+              w="full"
+              textAlign="left"
+              bg="transparent"
+              border="none"
+              p={0}
+              m={0}
               cursor="pointer"
               _hover={{ bg: 'gray.50' }}
-              onClick={() => handleClientClick(client)}
+              _active={{ bg: 'gray.100' }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleClientClick(client);
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleClientClick(client);
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleClientClick(client);
+                }
+              }}
               transition="background-color 0.2s"
+              className="client-row-touch touchable"
             >
-              <HStack>
-                <Box onClick={e => e.stopPropagation()}>
+              <Flex
+                align="center"
+                justify="space-between"
+                py={4}
+                px={2}
+                minH="60px"
+                borderRadius="md"
+                w="full"
+              >
+              <HStack flex={1} minW={0}>
+                <Box onClick={e => e.stopPropagation()} flexShrink={0}>
                   <Checkbox
                     isChecked={selectedClientIds.includes(client.id)}
                     onChange={e => {
@@ -436,28 +476,42 @@ const Clients: React.FC = () => {
                       handleSelectClient(client.id);
                     }}
                     mr={4}
+                    size="lg"
                   />
                 </Box>
-                <Avatar name={client.name} size="md" bg="purple.500" />
-                <Box>
-                  <Text fontWeight="medium" color="gray.900">{client.name}</Text>
-                  <Flex align="center" color="gray.500" fontSize="sm" gap={2}>
-                    <EnvelopeIcon style={{ width: 16, height: 16 }} />{client.email}
-                    <PhoneIcon style={{ width: 16, height: 16, marginLeft: 8 }} />{client.phone}
+                <Avatar name={client.name} size="md" bg="purple.500" flexShrink={0} />
+                <Box flex={1} minW={0}>
+                  <Text fontWeight="medium" color="gray.900" fontSize={{ base: "sm", md: "md" }} className="responsive-text">
+                    {client.name}
+                  </Text>
+                  <Flex align="center" color="gray.500" fontSize={{ base: "xs", md: "sm" }} gap={2} flexWrap="wrap" mt={1}>
+                    <Flex align="center" gap={1} minW={0}>
+                      <EnvelopeIcon style={{ width: 14, height: 14, flexShrink: 0 }} />
+                      <Text noOfLines={1} overflow="hidden" textOverflow="ellipsis" className="responsive-text">
+                        {client.email}
+                      </Text>
+                    </Flex>
+                    <Flex align="center" gap={1} minW={0}>
+                      <PhoneIcon style={{ width: 14, height: 14, flexShrink: 0 }} />
+                      <Text noOfLines={1} overflow="hidden" textOverflow="ellipsis" className="responsive-text">
+                        {client.phone}
+                      </Text>
+                    </Flex>
                   </Flex>
-                  <Flex gap={2} mt={1} flexWrap="wrap">
-                    <Badge px={2} py={0.5} borderRadius="full" bg="purple.100" color="purple.700" fontSize="xs" fontWeight="medium">
+                  <Flex gap={2} mt={2} flexWrap="wrap">
+                    <Badge px={2} py={0.5} borderRadius="full" bg="purple.100" color="purple.700" fontSize="xs" fontWeight="medium" className="responsive-label">
                       {getServiceName(client.service_id)}
                     </Badge>
                     {client.custom_price_per_hour && (
-                      <Badge px={2} py={0.5} borderRadius="full" bg="green.100" color="green.700" fontSize="xs" fontWeight="medium">
+                      <Badge px={2} py={0.5} borderRadius="full" bg="green.100" color="green.700" fontSize="xs" fontWeight="medium" className="responsive-label">
                         ${client.custom_price_per_hour}/h
                       </Badge>
                     )}
                   </Flex>
                 </Box>
               </HStack>
-            </Flex>
+              </Flex>
+            </Box>
           ))}
           {filteredClients.length === 0 && (
             <Text color="gray.500" textAlign="center" py={8}>
