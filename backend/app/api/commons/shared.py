@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from enum import Enum
 
 
@@ -13,3 +14,10 @@ class RecurrenceUpdateScope(str, Enum):
             if scope.value.lower() == scope_str.lower():
                 return scope
         raise ValueError(f"Invalid RecurrenceUpdateScope: {scope_str}")
+
+
+def ensure_utc(dt: datetime) -> datetime:
+    """Convert naive or non-UTC datetime to UTC and make it aware."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)

@@ -24,6 +24,7 @@ class MeetingBase(BaseModel):
     client_id: UUID
     title: str | None = None
     recurrence_id: UUID | None = None
+    membership_id: UUID | None = None
     start_time: datetime
     end_time: datetime
     price_per_hour: float = Field(..., ge=0.0)
@@ -40,6 +41,7 @@ class MeetingUpdateRequest(BaseModel):
     client_id: UUID | None = None
     title: str | None = None
     recurrence_id: UUID | None = None
+    membership_id: UUID | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None
     price_per_hour: float | None = Field(None, ge=0.0)
@@ -52,6 +54,12 @@ class MeetingResponse(MeetingBase):
     user_id: UUID
     price_total: float
     created_at: datetime
+    start_time: datetime
+    end_time: datetime
+    title: str | None = None
+    status: str
+    paid: bool
+    price_per_hour: float
 
     class Config:
         from_attributes = True

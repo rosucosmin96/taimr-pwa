@@ -207,6 +207,14 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
 
   const meetingColumns = getMeetingColumnsDynamicPrecise(filteredMeetings);
 
+  // Utility: Convert UTC ISO string to local Date object
+  function utcToLocalDate(utcString: string): Date {
+    const date = new Date(utcString);
+    console.log(utcString);
+    console.log(date);
+    return date;
+  }
+
   return (
     <Box bg="white" rounded="xl" shadow="md" p={6}>
       <Flex align="center" justify="space-between" mb={2}>
@@ -266,8 +274,8 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
         {/* Meeting blocks */}
         {filteredMeetings.map((meeting) => {
           const { top, height } = getClippedMeetingPositionPx(meeting);
-          const startTime = new Date(meeting.start_time);
-          const endTime = new Date(meeting.end_time);
+          const startTime = utcToLocalDate(meeting.start_time);
+          const endTime = utcToLocalDate(meeting.end_time);
           const colInfo = meetingColumns[meeting.id] || { col: 0, colCount: 1 };
           // Responsive available width
           const availableWidth = Math.max(0, containerWidth - GUTTER_WIDTH - 16); // 16px for padding

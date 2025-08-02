@@ -37,6 +37,7 @@ import {
   GridItem
 } from '@chakra-ui/react';
 import { apiClient, StatsOverview, Service, DailyBreakdownItem } from '../lib/api';
+import ClientStatisticsModal from '../components/ClientStatisticsModal';
 
 interface ServiceStats {
   serviceId: string;
@@ -68,19 +69,19 @@ const ResponsiveContentWrapper: React.FC<{ children: (maxWidth: number) => React
 
 const useKpiGridLayout = () => {
   const isSidebarActive = useBreakpointValue({ base: false, md: true });
-  const [isThreeByTwo, setIsThreeByTwo] = useState(false);
+  const [isTwoByFour, setIsTwoByFour] = useState(false);
   useEffect(() => {
     function handleResize() {
       const sidebar = isSidebarActive ? SIDEBAR_WIDTH : 0;
       const safe = SAFE_MARGIN;
-      const gridMinWidth = 3 * MIN_CELL_WIDTH;
-      setIsThreeByTwo(window.innerWidth < sidebar + gridMinWidth + safe);
+      const gridMinWidth = 4 * MIN_CELL_WIDTH; // 4 columns
+      setIsTwoByFour(window.innerWidth < sidebar + gridMinWidth + safe);
     }
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [isSidebarActive]);
-  return isThreeByTwo;
+  return isTwoByFour;
 };
 
 const Stats: React.FC = () => {
@@ -98,13 +99,15 @@ const Stats: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [dailyBreakdown, setDailyBreakdown] = useState<DailyBreakdownItem[]>([]);
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
   // Responsive breakpoints
   const isMobile = useBreakpointValue({ base: true, md: false });
   const isTablet = useBreakpointValue({ base: false, md: true, lg: false });
   const isDesktop = useBreakpointValue({ base: false, lg: true });
 
-  const isThreeByTwo = useKpiGridLayout();
+  const isTwoByFour = useKpiGridLayout();
 
   // Fetch services on component mount
   useEffect(() => {
@@ -156,17 +159,17 @@ const Stats: React.FC = () => {
           switch (period) {
             case 'last7days':
               startDateLocal = new Date(today);
-              startDateLocal.setDate(today.getDate() - 7);
+              startDateLocal.setDate(today.getDate() - 6); // Changed from -7 to -6 to get exactly 7 days
               startDateLocal.setHours(0, 0, 0, 0);
               break;
             case 'last30days':
               startDateLocal = new Date(today);
-              startDateLocal.setDate(today.getDate() - 30);
+              startDateLocal.setDate(today.getDate() - 29); // Changed from -30 to -29 to get exactly 30 days
               startDateLocal.setHours(0, 0, 0, 0);
               break;
             case 'last90days':
               startDateLocal = new Date(today);
-              startDateLocal.setDate(today.getDate() - 90);
+              startDateLocal.setDate(today.getDate() - 89); // Changed from -90 to -89 to get exactly 90 days
               startDateLocal.setHours(0, 0, 0, 0);
               break;
             case 'thisMonth':
@@ -218,42 +221,26 @@ const Stats: React.FC = () => {
         // Fetch client statistics
         if (startDateParam && endDateParam) {
           try {
-            const clients = await apiClient.getClients(serviceIdParam);
-            const clientStatsPromises = clients.map(async (client) => {
-              try {
-                // For now, we'll use mock data since the API doesn't have client-specific stats
-                // In a real implementation, you'd have an endpoint like /stats/client/{client_id}
-                const mockClientStats = {
-                  clientId: client.id,
-                  clientName: client.name,
-                  totalMeetings: Math.floor(Math.random() * 10) + 1,
-                  canceledMeetings: Math.floor(Math.random() * 3),
-                  totalRevenue: Math.random() * 1000 + 100,
-                  pricePerHour: client.custom_price_per_hour || 50,
-                  hours: Math.random() * 20 + 2
-                };
-
-                return {
-                  ...mockClientStats,
-                  pricePerMeeting: mockClientStats.totalRevenue / mockClientStats.totalMeetings
-                };
-              } catch (err) {
-                console.error(`Failed to fetch stats for client ${client.name}:`, err);
-                return {
-                  clientId: client.id,
-                  clientName: client.name,
-                  totalMeetings: 0,
-                  canceledMeetings: 0,
-                  totalRevenue: 0,
-                  pricePerHour: client.custom_price_per_hour || 0,
-                  hours: 0,
-                  pricePerMeeting: 0
-                };
-              }
-            });
-
-            const clientStatsData = await Promise.all(clientStatsPromises);
-            setClientStats(clientStatsData);
+            const clientStatsData = await apiClient.getClientStats(startDateParam, endDateParam, serviceIdParam);
+            setClientStats(clientStatsData.map(item => {
+              const stats = item.client_stats;
+              const totalRevenue = stats.total_revenue;
+              const totalMeetings = stats.total_meetings;
+              const doneMeetings = stats.done_meetings;
+              const hours = stats.total_hours;
+              return {
+                clientId: stats.client_id,
+                clientName: stats.client_name,
+                totalMeetings,
+                doneMeetings,
+                canceledMeetings: stats.canceled_meetings,
+                totalRevenue,
+                pricePerHour: hours > 0 ? totalRevenue / hours : 0,
+                hours,
+                pricePerMeeting: doneMeetings > 0 ? totalRevenue / doneMeetings : 0,
+                // Optionally, you can add: meetings: item.meetings
+              };
+            }));
           } catch (err) {
             console.error('Failed to fetch client stats:', err);
             setClientStats([]);
@@ -331,6 +318,10 @@ const Stats: React.FC = () => {
     return ((current - previous) / previous) * 100;
   };
 
+  // Add helper function for safe formatting
+  const safeToFixed = (value: number | undefined | null, digits = 2) =>
+    typeof value === 'number' && !isNaN(value) ? value.toFixed(digits) : '0.00';
+
   // Filter clients based on search term
   const filteredClientStats = clientStats.filter(client =>
     client.clientName.toLowerCase().includes(clientSearchTerm.toLowerCase())
@@ -379,8 +370,8 @@ const Stats: React.FC = () => {
       color: 'blue.100'
     },
     {
-      title: 'Total Meetings',
-      value: stats?.total_meetings || 0,
+      title: 'Done Meetings',
+      value: stats?.done_meetings || 0,
       icon: <CalendarDaysIcon style={{ width: 28, height: 28 }} color="#805AD5" />,
       color: 'purple.100'
     },
@@ -391,24 +382,47 @@ const Stats: React.FC = () => {
       color: 'yellow.100'
     },
     {
-      title: 'Average Price per Meeting',
-      value: `$${stats && stats.total_meetings > 0 ? (stats.total_revenue / stats.total_meetings).toFixed(2) : '0.00'}`,
+      title: 'Revenue Paid',
+      value: `$${stats?.revenue_paid?.toFixed(2) || '0.00'}`,
       icon: <CurrencyDollarIcon style={{ width: 28, height: 28 }} color="#38A169" />,
       color: 'green.100'
     },
     {
-      title: 'Average Price per Hour',
+      title: 'Clients with Memberships',
+      value: stats?.clients_with_memberships || 0,
+      icon: <UserGroupIcon style={{ width: 28, height: 28 }} color="#3182CE" />,
+      color: 'blue.100'
+    },
+    // New KPI: Price per Meeting
+    {
+      title: 'Price per Meeting',
+      value: `$${stats && stats.done_meetings > 0 ? (stats.total_revenue / stats.done_meetings).toFixed(2) : '0.00'}`,
+      icon: <CurrencyDollarIcon style={{ width: 28, height: 28 }} color="#38A169" />,
+      color: 'green.100'
+    },
+    // New KPI: Price per Hour
+    {
+      title: 'Price per Hour',
       value: `$${stats && stats.total_hours > 0 ? (stats.total_revenue / stats.total_hours).toFixed(2) : '0.00'}`,
       icon: <ClockIcon style={{ width: 28, height: 28 }} color="#3182CE" />,
       color: 'blue.100'
     }
   ];
 
+  // Adjust grid layout for 8 cards
+  const kpiGridColumns = { base: 1, sm: 2, md: 3, lg: 4, xl: 4, '2xl': 4 };
+
   // Meeting status data for pie chart
   const meetingStatusData = [
     { name: 'Done', value: stats?.done_meetings || 0, color: '#38A169' },
     { name: 'Canceled', value: stats?.canceled_meetings || 0, color: '#E53E3E' },
     { name: 'Upcoming', value: (stats?.total_meetings || 0) - (stats?.done_meetings || 0) - (stats?.canceled_meetings || 0), color: '#3182CE' },
+  ];
+
+  // Membership status data for pie chart
+  const membershipStatusData = [
+    { name: 'Active', value: stats?.active_memberships || 0, color: '#38A169' },
+    { name: 'Expired', value: (stats?.total_memberships || 0) - (stats?.active_memberships || 0), color: '#E53E3E' },
   ];
 
   // Weekly revenue data (from API)
@@ -571,8 +585,8 @@ const Stats: React.FC = () => {
 
           {/* KPI Cards */}
           <Grid
-            templateColumns={isThreeByTwo ? '1fr 1fr' : '1fr 1fr 1fr'}
-            templateRows={isThreeByTwo ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)'}
+            templateColumns={isTwoByFour ? '1fr 1fr' : '1fr 1fr 1fr 1fr'}
+            templateRows={isTwoByFour ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)'}
             gap={4}
             w="full"
           >
@@ -728,6 +742,32 @@ const Stats: React.FC = () => {
                 </ResponsiveContainer>
               </Box>
             </Box>
+
+            {/* Membership Status Distribution */}
+            {stats?.total_memberships && stats.total_memberships > 0 && (
+              <Box bg="white" rounded="xl" shadow="md" p={{ base: 3, md: 6 }} w="full" maxW="100%">
+                <Text fontWeight="semibold" fontSize={{ base: "sm", md: "lg" }} mb={3}>Membership Status</Text>
+                <Box h={{ base: "40", md: "64" }} w="full" maxW="100%">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={membershipStatusData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={isMobile ? 50 : 80}
+                        dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}`}
+                      >
+                        {membershipStatusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Box>
+              </Box>
+            )}
           </VStack>
 
           {/* Period Comparison Panel - Histogram */}
@@ -785,6 +825,61 @@ const Stats: React.FC = () => {
             </Box>
           )}
 
+          {/* Membership Revenue Comparison */}
+          {stats?.total_memberships && stats.total_memberships > 0 && (
+            <Box bg="white" rounded="xl" shadow="md" p={{ base: 3, md: 6 }} w="full" maxW={maxWidth} minW={0}>
+              <Text fontWeight="semibold" fontSize={{ base: "sm", md: "lg" }} mb={3}>Membership Revenue Breakdown</Text>
+              <Box h={{ base: "40", md: "64" }} w="full" maxW="100%">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[
+                    {
+                      name: 'Total Revenue',
+                      revenue: stats?.membership_revenue || 0,
+                      fill: '#38A169'
+                    },
+                    {
+                      name: 'Revenue Paid',
+                      revenue: stats?.membership_revenue_paid || 0,
+                      fill: '#3182CE'
+                    },
+                    {
+                      name: 'Revenue Outstanding',
+                      revenue: (stats?.membership_revenue || 0) - (stats?.membership_revenue_paid || 0),
+                      fill: '#E53E3E'
+                    }
+                  ]}>
+                    <XAxis dataKey="name" fontSize={isMobile ? 8 : 12} />
+                    <YAxis fontSize={isMobile ? 8 : 12} />
+                    <Tooltip formatter={(value) => [`$${value}`, 'Revenue']} />
+                    <Bar dataKey="revenue" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+              <VStack spacing={{ base: 3, md: 4 }} mt={4} w="full">
+                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{ base: 3, md: 4 }} w="full">
+                  <Box textAlign="center">
+                    <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Revenue</Text>
+                    <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="green.600">
+                      ${stats?.membership_revenue.toFixed(2) || '0.00'}
+                    </Text>
+                  </Box>
+                  <Box textAlign="center">
+                    <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Revenue Paid</Text>
+                    <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="blue.600">
+                      ${stats?.membership_revenue_paid.toFixed(2) || '0.00'}
+                    </Text>
+                  </Box>
+                  <Box textAlign="center">
+                    <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Outstanding</Text>
+                    <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="red.600">
+                      ${((stats?.membership_revenue || 0) - (stats?.membership_revenue_paid || 0)).toFixed(2)}
+                    </Text>
+                  </Box>
+                </SimpleGrid>
+              </VStack>
+            </Box>
+          )}
+
           {/* Client Statistics Table */}
           {clientStats.length > 0 && (
             <Box w="full" maxW={maxWidth} minW={0}>
@@ -825,24 +920,24 @@ const Stats: React.FC = () => {
                                 <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{client.totalMeetings}</Text>
                               </Box>
                               <Box>
-                                <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Canceled</Text>
-                                <Text fontWeight="bold" color="red.500" fontSize={{ base: "sm", md: "md" }}>{client.canceledMeetings}</Text>
+                                <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Done Meetings</Text>
+                                <Text fontWeight="bold" color="red.500" fontSize={{ base: "sm", md: "md" }}>{client.doneMeetings}</Text>
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Revenue</Text>
-                                <Text fontWeight="bold" color="green.600" fontSize={{ base: "sm", md: "md" }}>${client.totalRevenue.toFixed(2)}</Text>
+                                <Text fontWeight="bold" color="green.600" fontSize={{ base: "sm", md: "md" }}>${safeToFixed(client.totalRevenue)}</Text>
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Price/Hour</Text>
-                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${client.pricePerHour.toFixed(2)}</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${safeToFixed(client.pricePerHour)}</Text>
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Hours</Text>
-                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{client.hours.toFixed(1)}h</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{safeToFixed(client.hours, 1)}h</Text>
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Price/Meeting</Text>
-                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${client.pricePerMeeting.toFixed(2)}</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${safeToFixed(client.pricePerMeeting)}</Text>
                               </Box>
                             </SimpleGrid>
                           </VStack>
@@ -858,7 +953,7 @@ const Stats: React.FC = () => {
                           <Tr>
                             <Th fontSize={{ base: "xs", md: "sm" }}>Client</Th>
                             <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Total Meetings</Th>
-                            <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Canceled Meetings</Th>
+                            <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Done Meetings</Th>
                             <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Total Revenue</Th>
                             <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Price Per Hour</Th>
                             <Th isNumeric fontSize={{ base: "xs", md: "sm" }}>Total Hours</Th>
@@ -867,14 +962,21 @@ const Stats: React.FC = () => {
                         </Thead>
                         <Tbody>
                           {filteredClientStats.map((client) => (
-                            <Tr key={client.clientId}>
+                            <Tr
+                              key={client.clientId}
+                              onClick={() => {
+                                setSelectedClientId(client.clientId);
+                                setModalOpen(true);
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            >
                               <Td fontWeight="medium" fontSize={{ base: "xs", md: "sm" }}>{client.clientName}</Td>
                               <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.totalMeetings}</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.canceledMeetings}</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${client.totalRevenue.toFixed(2)}</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${client.pricePerHour.toFixed(2)}</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.hours.toFixed(1)}h</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${client.pricePerMeeting.toFixed(2)}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.doneMeetings}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${safeToFixed(client.totalRevenue)}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${safeToFixed(client.pricePerHour)}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{safeToFixed(client.hours, 1)}h</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${safeToFixed(client.pricePerMeeting)}</Td>
                             </Tr>
                           ))}
                         </Tbody>
@@ -892,6 +994,16 @@ const Stats: React.FC = () => {
               </Box>
             </Box>
           )}
+
+          {/* Client Statistics Modal */}
+          <ClientStatisticsModal
+            isOpen={modalOpen}
+            onClose={() => setModalOpen(false)}
+            clientId={selectedClientId || ''}
+            startDate={startDate}
+            endDate={endDate}
+            serviceId={selectedService !== 'all' ? selectedService : undefined}
+          />
         </Stack>
       )}
     </ResponsiveContentWrapper>

@@ -31,6 +31,7 @@ export interface Meeting {
   client_id: string;
   title?: string;
   recurrence_id?: string;
+  membership_id?: string;
   start_time: string;
   end_time: string;
   price_per_hour: number;
@@ -45,6 +46,7 @@ export interface Profile {
   email: string;
   name: string;
   profile_picture_url?: string;
+  tutorial_checked: boolean;
   created_at: string;
 }
 
@@ -55,13 +57,20 @@ export interface StatsOverview {
   total_clients: number;
   total_revenue: number;
   total_hours: number;
+  // Membership stats
+  total_memberships: number;
+  active_memberships: number;
+  membership_revenue: number;
+  membership_revenue_paid: number;
+  clients_with_memberships: number;
+  revenue_paid: number; // NEW: sum of price_total for meetings that are done and paid
 }
 
 // Recurrence types
 export interface RecurrenceFrequency {
-  weekly: 'weekly';
-  biweekly: 'biweekly';
-  monthly: 'monthly';
+  weekly: 'WEEKLY';
+  biweekly: 'BIWEEKLY';
+  monthly: 'MONTHLY';
 }
 
 export interface RecurrenceUpdateScope {
@@ -73,7 +82,7 @@ export interface RecurrenceUpdateScope {
 export interface RecurrenceCreateRequest {
   service_id: string;
   client_id: string;
-  frequency: keyof RecurrenceFrequency;
+  frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
   start_date: string;
   end_date: string;
   title: string;
@@ -87,7 +96,7 @@ export interface RecurrenceResponse {
   user_id: string;
   service_id: string;
   client_id: string;
-  frequency: keyof RecurrenceFrequency;
+  frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
   start_date: string;
   end_date: string;
   title: string;
@@ -114,6 +123,81 @@ export interface DailyBreakdownItem {
   revenue: number;
   meetings_count: number;
   meeting_ids: string[];
+}
+
+// Membership types
+export interface Membership {
+  id: string;
+  user_id: string;
+  service_id: string;
+  client_id: string;
+  name: string;
+  total_meetings: number;
+  price_per_membership: number;
+  price_per_meeting: number;
+  availability_days: number;
+  status: 'active' | 'expired' | 'canceled';
+  paid: boolean;
+  start_date?: string;
+  created_at: string;
+}
+
+export interface MembershipCreateRequest {
+  service_id: string;
+  client_id: string;
+  name: string;
+  total_meetings: number;
+  price_per_membership: number;
+  availability_days: number;
+}
+
+export interface MembershipUpdateRequest {
+  name?: string;
+  total_meetings?: number;
+  price_per_membership?: number;
+  availability_days?: number;
+  status?: 'active' | 'expired' | 'canceled';
+  paid?: boolean;
+}
+
+export interface ClientStats {
+  client_id: string;
+  client_name: string;
+  total_meetings: number;
+  done_meetings: number;
+  canceled_meetings: number;
+  total_revenue: number;
+  total_hours: number;
+  last_meeting?: string | null;
+  price_per_hour?: number;
+  price_per_meeting?: number;
+}
+
+export interface ClientStatsResponse {
+  client_stats: ClientStats;
+  meetings: Meeting[];
+}
+
+// Notification types
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  related_entity_id?: string;
+  related_entity_type?: string;
+  read: boolean;
+  read_at?: string;
+  created_at: string;
+}
+
+export interface NotificationUpdateRequest {
+  read?: boolean;
+}
+
+export interface NotificationMarkReadRequest {
+  notification_ids: string[];
 }
 
 // API client with authentication
@@ -237,11 +321,16 @@ class ApiClient {
     return this.request<Meeting[]>(`/meetings/${queryString ? `?${queryString}` : ''}`);
   }
 
+  async getMeeting(id: string): Promise<Meeting> {
+    return this.request<Meeting>(`/meetings/${id}`);
+  }
+
   async createMeeting(data: {
     service_id: string;
     client_id: string;
     title?: string;
     recurrence_id?: string;
+    membership_id?: string;
     start_time: string;
     end_time: string;
     price_per_hour: number;
@@ -264,8 +353,9 @@ class ApiClient {
     });
   }
 
-  async deleteMeeting(id: string): Promise<void> {
-    await this.request(`/meetings/${id}`, {
+  async deleteMeeting(id: string, deleteScope?: string): Promise<void> {
+    const params = deleteScope ? `?delete_scope=${deleteScope}` : '';
+    await this.request(`/meetings/${id}${params}`, {
       method: 'DELETE',
     });
   }
@@ -306,6 +396,7 @@ class ApiClient {
   async updateProfile(data: {
     name?: string;
     profile_picture_url?: string;
+    tutorial_checked?: boolean;
   }): Promise<Profile> {
     return this.request<Profile>('/profile/', {
       method: 'PUT',
@@ -326,6 +417,18 @@ class ApiClient {
     return this.request<StatsOverview>(`/stats/overview?${params}`);
   }
 
+  async getClientStats(
+    startDate?: string,
+    endDate?: string,
+    serviceId?: string
+  ): Promise<ClientStatsResponse[]> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    if (serviceId) params.append('service_id', serviceId);
+    return this.request<ClientStatsResponse[]>(`/stats/clients?${params}`);
+  }
+
   async getDailyBreakdown(startDate: string, endDate: string, serviceId?: string): Promise<DailyBreakdownItem[]> {
     const params = new URLSearchParams({
       start_date: startDate,
@@ -334,10 +437,94 @@ class ApiClient {
     if (serviceId) params.append('service_id', serviceId);
     return this.request<DailyBreakdownItem[]>(`/stats/daily_breakdown?${params}`);
   }
+
+  async getSingleClientStats(
+    clientId: string,
+    startDate?: string,
+    endDate?: string,
+    serviceId?: string
+  ): Promise<ClientStatsResponse> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    if (serviceId) params.append('service_id', serviceId);
+    return this.request<ClientStatsResponse>(`/stats/clients/${clientId}?${params}`);
+  }
+
+  // Memberships API
+  async getMemberships(): Promise<Membership[]> {
+    return this.request<Membership[]>('/memberships/');
+  }
+
+  async createMembership(data: MembershipCreateRequest): Promise<Membership> {
+    return this.request<Membership>('/memberships/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateMembership(id: string, data: MembershipUpdateRequest): Promise<Membership> {
+    return this.request<Membership>(`/memberships/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMembership(id: string): Promise<void> {
+    await this.request(`/memberships/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getActiveMembership(clientId: string): Promise<Membership | null> {
+    return this.request<Membership | null>(`/memberships/active/${clientId}`);
+  }
+
+  async getMembershipMeetings(membershipId: string): Promise<Meeting[]> {
+    return this.request<Meeting[]>(`/memberships/${membershipId}/meetings`);
+  }
+
+  // Notifications API
+  async getNotifications(unreadOnly?: boolean): Promise<Notification[]> {
+    const params = new URLSearchParams();
+    if (unreadOnly) params.append('unread_only', 'true');
+    const queryString = params.toString();
+    return this.request<Notification[]>(`/notifications/${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async updateNotification(id: string, data: NotificationUpdateRequest): Promise<Notification> {
+    return this.request<Notification>(`/notifications/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async markNotificationsRead(notificationIds: string[]): Promise<Notification[]> {
+    return this.request<Notification[]>('/notifications/mark-read', {
+      method: 'POST',
+      body: JSON.stringify({ notification_ids: notificationIds }),
+    });
+  }
+
+  async deleteNotification(id: string): Promise<void> {
+    await this.request(`/notifications/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 // Create and export API client instance
 export const apiClient = new ApiClient(API_BASE_URL);
 
-// For development, set a mock token
-apiClient.setToken('test-token');
+// Function to update token from Supabase session
+export const updateApiToken = (token: string | null) => {
+  if (token) {
+    apiClient.setToken(token);
+  } else {
+    apiClient.setToken('');
+  }
+};
+
+// For development, set a dummy token
+// This will be overridden by updateApiToken when user logs in
+apiClient.setToken('dev-token');

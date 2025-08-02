@@ -21,8 +21,10 @@ import {
   Text,
   VStack,
   HStack,
+  Box,
+  Badge,
 } from '@chakra-ui/react';
-import { apiClient, Service, Client } from '../lib/api';
+import { apiClient, Service, Client, Membership } from '../lib/api';
 
 interface MeetingModalProps {
   isOpen: boolean;
@@ -30,10 +32,22 @@ interface MeetingModalProps {
   onSuccess: () => void;
 }
 
+// Utility: Convert local datetime string (yyyy-MM-ddTHH:mm) to UTC ISO string
+function localDateTimeToUTCISOString(localDateTime: string): string {
+  // localDateTime is in 'yyyy-MM-ddTHH:mm' format
+  const [datePart, timePart] = localDateTime.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = timePart.split(':').map(Number);
+  // JS Date: months are 0-based
+  const localDate = new Date(year, month - 1, day, hour, minute);
+  return localDate.toISOString();
+}
+
 const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const toast = useToast();
   const [services, setServices] = useState<Service[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [activeMembership, setActiveMembership] = useState<Membership | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,10 +61,11 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
   const [pricePerMeeting, setPricePerMeeting] = useState('');
   const [status, setStatus] = useState<'upcoming' | 'done' | 'canceled'>('upcoming');
   const [paid, setPaid] = useState(false);
+  const [useMembership, setUseMembership] = useState(false);
 
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurrenceFrequency, setRecurrenceFrequency] = useState<'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'>('WEEKLY');
   const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
 
   // For duration logic
@@ -112,6 +127,15 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
     }
   }, [startTime, endTime, pricePerHour, calculatePricePerMeeting, isEditingPricePerHour, isEditingPricePerMeeting]);
 
+  // Update pricing when membership is selected
+  useEffect(() => {
+    if (useMembership && activeMembership) {
+      setPricePerMeeting(activeMembership.price_per_meeting.toString());
+      const hourlyRate = calculatePricePerHour(activeMembership.price_per_meeting);
+      setPricePerHour(hourlyRate);
+    }
+  }, [useMembership, activeMembership, calculatePricePerHour]);
+
   // Fetch services on open
   useEffect(() => {
     if (!isOpen) return;
@@ -131,6 +155,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
       setClientId('');
       setServiceDuration(null);
       setServicePrice(null);
+      setActiveMembership(null);
       return;
     }
     setLoading(true);
@@ -141,9 +166,24 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
       const service = services.find(s => s.id === serviceId);
       setServiceDuration(service?.default_duration_minutes || null);
       setServicePrice(service?.default_price_per_hour || null);
+      setActiveMembership(null);
       setLoading(false);
     });
   }, [serviceId]);
+
+  // Fetch active membership when client changes
+  useEffect(() => {
+    if (!clientId) {
+      setActiveMembership(null);
+      setUseMembership(false);
+      return;
+    }
+
+    apiClient.getActiveMembership(clientId).then((membership) => {
+      setActiveMembership(membership);
+      setUseMembership(false); // Default to not using membership
+    });
+  }, [clientId]);
 
   // Update client duration/price when client changes
   useEffect(() => {
@@ -190,7 +230,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
 
     // Reset recurrence settings
     setIsRecurring(false);
-    setRecurrenceFrequency('weekly');
+            setRecurrenceFrequency('WEEKLY');
     setRecurrenceEndDate('');
   }, [isOpen, clientDuration, serviceDuration, clientPrice, servicePrice]);
 
@@ -214,20 +254,22 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
     try {
       if (isRecurring && recurrenceEndDate) {
         // Create recurrence
-        const startDate = new Date(startTime);
-        // Convert end date to datetime by combining with the start time
-        const endDate = new Date(recurrenceEndDate + 'T' + startDate.toTimeString().slice(0, 5));
+        // Convert local times to UTC for start_date and end_date
+        const startDateUTC = localDateTimeToUTCISOString(startTime);
+        const endDateUTC = localDateTimeToUTCISOString(recurrenceEndDate + 'T' + new Date(startTime).toTimeString().slice(0, 5));
 
-        // Extract time components
-        const startTimeOnly = startDate.toTimeString().slice(0, 5); // HH:mm
-        const endTimeOnly = new Date(endTime).toTimeString().slice(0, 5); // HH:mm
+        // Extract time components in UTC
+        const startDate = new Date(startTime);
+        const endDate = new Date(endTime);
+        const startTimeOnly = startDate.getUTCHours().toString().padStart(2, '0') + ':' + startDate.getUTCMinutes().toString().padStart(2, '0'); // HH:mm in UTC
+        const endTimeOnly = endDate.getUTCHours().toString().padStart(2, '0') + ':' + endDate.getUTCMinutes().toString().padStart(2, '0'); // HH:mm in UTC
 
         await apiClient.createRecurrence({
           service_id: serviceId,
           client_id: clientId,
           frequency: recurrenceFrequency,
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
+          start_date: startDateUTC,
+          end_date: endDateUTC,
           title,
           start_time: startTimeOnly,
           end_time: endTimeOnly,
@@ -236,16 +278,23 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
         toast({ title: 'Recurring meeting created', status: 'success', duration: 2000, isClosable: true });
       } else {
         // Create single meeting
-        await apiClient.createMeeting({
+        const meetingData: any = {
           service_id: serviceId,
           client_id: clientId,
           title,
-          start_time: new Date(startTime).toISOString(),
-          end_time: new Date(endTime).toISOString(),
+          start_time: localDateTimeToUTCISOString(startTime),
+          end_time: localDateTimeToUTCISOString(endTime),
           price_per_hour: parseFloat(pricePerHour),
           status,
           paid,
-        });
+        };
+
+        // Add membership_id if using membership
+        if (useMembership && activeMembership) {
+          meetingData.membership_id = activeMembership.id;
+        }
+
+        await apiClient.createMeeting(meetingData);
         toast({ title: 'Meeting created', status: 'success', duration: 2000, isClosable: true });
       }
       onSuccess();
@@ -285,6 +334,29 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
                     ))}
                   </Select>
                 </FormControl>
+
+                {/* Active Membership Display */}
+                {activeMembership && (
+                  <Box p={4} bg="purple.50" borderRadius="md" border="1px solid" borderColor="purple.200">
+                    <Flex justify="space-between" align="center" mb={2}>
+                      <Text fontWeight="semibold" color="purple.700">
+                        Active Membership Available
+                      </Text>
+                      <Badge colorScheme="purple">{activeMembership.name}</Badge>
+                    </Flex>
+                    <Text fontSize="sm" color="purple.600" mb={3}>
+                      {activeMembership.total_meetings} meetings • ${activeMembership.price_per_meeting} per meeting
+                    </Text>
+                    <Checkbox
+                      isChecked={useMembership}
+                      onChange={e => setUseMembership(e.target.checked)}
+                      colorScheme="purple"
+                    >
+                      Use this membership for this meeting
+                    </Checkbox>
+                  </Box>
+                )}
+
                 <FormControl isRequired>
                   <FormLabel>Title</FormLabel>
                   <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Meeting title" />
@@ -307,6 +379,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
                     onBlur={() => setIsEditingPricePerHour(false)}
                     min={0}
                     step={0.01}
+                    isDisabled={useMembership && !!activeMembership}
                   />
                 </FormControl>
                 <FormControl isRequired>
@@ -319,6 +392,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
                     onBlur={() => setIsEditingPricePerMeeting(false)}
                     min={0}
                     step={0.01}
+                    isDisabled={useMembership && !!activeMembership}
                   />
                 </FormControl>
 
@@ -335,9 +409,9 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
                     <FormControl isRequired={isRecurring}>
                       <FormLabel>Frequency</FormLabel>
                       <Select value={recurrenceFrequency} onChange={e => setRecurrenceFrequency(e.target.value as any)}>
-                        <option value="weekly">Weekly</option>
-                        <option value="biweekly">Bi-weekly</option>
-                        <option value="monthly">Monthly</option>
+                        <option value="WEEKLY">Weekly</option>
+                        <option value="BIWEEKLY">Bi-weekly</option>
+                        <option value="MONTHLY">Monthly</option>
                       </Select>
                     </FormControl>
 

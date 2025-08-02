@@ -259,9 +259,7 @@ const MeetingViewModal: React.FC<MeetingViewModalProps> = ({ isOpen, onClose, on
   const performDelete = async (deleteScope?: string) => {
     setDeleting(true);
     try {
-      // In a real implementation, you would pass the delete scope to the API
-      // For now, we'll just delete the meeting
-      await apiClient.deleteMeeting(meeting!.id);
+      await apiClient.deleteMeeting(meeting!.id, deleteScope);
       toast({ title: 'Meeting deleted', status: 'success', duration: 2000, isClosable: true });
       onSuccess();
       onClose();

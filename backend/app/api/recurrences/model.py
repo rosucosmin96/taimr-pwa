@@ -6,9 +6,9 @@ from pydantic import BaseModel, Field, validator
 
 
 class RecurrenceFrequency(str, Enum):
-    WEEKLY = "weekly"
-    BIWEEKLY = "biweekly"
-    MONTHLY = "monthly"
+    WEEKLY = "WEEKLY"
+    BIWEEKLY = "BIWEEKLY"
+    MONTHLY = "MONTHLY"
 
     @classmethod
     def from_str(cls, frequency_str: str) -> "RecurrenceFrequency":

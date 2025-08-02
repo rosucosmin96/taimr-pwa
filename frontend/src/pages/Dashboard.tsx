@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import StatsCard from '../components/StatsCard';
 import DailyCalendar from '../components/DailyCalendar';
+import TutorialModal from '../components/TutorialModal';
 import { CalendarDaysIcon, UserGroupIcon, CurrencyDollarIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { Box, Grid, Heading, Text, Flex, Stack, Spinner, Alert, AlertIcon } from '@chakra-ui/react';
 import { apiClient, StatsOverview, Meeting, Profile } from '../lib/api';
@@ -20,6 +21,7 @@ const Dashboard: React.FC = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,6 +53,11 @@ const Dashboard: React.FC = () => {
         setWeekStats(weekStatsData);
         setTodayMeetings(meetingsData);
         setProfile(profileData);
+
+        // Show tutorial if user hasn't completed it
+        if (profileData && !profileData.tutorial_checked) {
+          setShowTutorial(true);
+        }
       } catch (err) {
         setError('Failed to load dashboard data');
         console.error('Dashboard data fetch error:', err);
@@ -83,6 +90,19 @@ const Dashboard: React.FC = () => {
       </Stack>
     );
   }
+
+  const handleTutorialComplete = async () => {
+    try {
+      if (profile) {
+        await apiClient.updateProfile({ tutorial_checked: true });
+        setProfile({ ...profile, tutorial_checked: true });
+      }
+    } catch (err) {
+      console.error('Failed to update tutorial status:', err);
+    } finally {
+      setShowTutorial(false);
+    }
+  };
 
   const kpis: KPI[] = [
     {
@@ -146,6 +166,13 @@ const Dashboard: React.FC = () => {
       </Grid>
       {/* Daily Calendar */}
       <DailyCalendar meetings={todayMeetings} />
+
+      {/* Tutorial Modal */}
+      <TutorialModal
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        onComplete={handleTutorialComplete}
+      />
     </Stack>
   );
 };
