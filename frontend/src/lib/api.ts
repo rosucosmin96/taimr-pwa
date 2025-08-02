@@ -46,6 +46,7 @@ export interface Profile {
   email: string;
   name: string;
   profile_picture_url?: string;
+  tutorial_checked: boolean;
   created_at: string;
 }
 
@@ -395,6 +396,7 @@ class ApiClient {
   async updateProfile(data: {
     name?: string;
     profile_picture_url?: string;
+    tutorial_checked?: boolean;
   }): Promise<Profile> {
     return this.request<Profile>('/profile/', {
       method: 'PUT',
