@@ -153,16 +153,39 @@ function Sidebar({ open, onClose, user }: { open: boolean; onClose: () => void; 
   return (
     <Drawer isOpen={open} placement="left" onClose={onClose}>
       <DrawerOverlay />
-      <DrawerContent>
+      <DrawerContent maxH="100vh" overflow="hidden">
         <DrawerCloseButton />
-        <Flex direction="column" minH="100vh" justify="space-between">
-          <Box p={4}>
+        <Flex
+          direction="column"
+          h="100%"
+          maxH="100vh"
+          overflow="hidden"
+        >
+          {/* Scrollable content area */}
+          <Box
+            flex="1"
+            overflowY="auto"
+            overflowX="hidden"
+            p={4}
+            pb={2}
+          >
             <Text fontWeight="bold" fontSize="xl" mb={6} pl={2}>
               taimr
             </Text>
             {navLinks}
           </Box>
-          {profileButton}
+
+          {/* Fixed profile section at bottom */}
+          <Box
+            p={4}
+            pt={2}
+            borderTop="1px solid"
+            borderColor="gray.200"
+            bg="white"
+            flexShrink={0}
+          >
+            {profileButton}
+          </Box>
         </Flex>
       </DrawerContent>
     </Drawer>

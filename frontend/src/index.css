@@ -162,6 +162,39 @@ html, body {
   }
 }
 
+/* Mobile navigation drawer fixes */
+.chakra-drawer__content {
+  max-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+.chakra-drawer__body {
+  height: 100% !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+/* Ensure drawer content is properly scrollable */
+.chakra-drawer__content .chakra-flex {
+  height: 100% !important;
+  max-height: 100vh !important;
+}
+
+/* Fix for mobile drawer scrolling */
+@media (max-width: 768px) {
+  .chakra-drawer__content {
+    width: 280px !important;
+    max-width: 85vw !important;
+  }
+
+  .chakra-drawer__content .chakra-box {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
 /* Ensure proper z-index stacking */
 .sticky-top {
   position: sticky;
