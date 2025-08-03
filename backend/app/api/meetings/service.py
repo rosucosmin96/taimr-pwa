@@ -112,7 +112,7 @@ class MeetingService:
 
         # Schedule status update job if meeting is upcoming
         if created_meeting.status == MeetingStatus.UPCOMING.value:
-            scheduler_service.schedule_meeting_status_update(
+            await scheduler_service.schedule_meeting_status_update(
                 created_meeting.id, created_meeting.end_time
             )
 
@@ -199,12 +199,12 @@ class MeetingService:
         # Update scheduled job if end_time changed
         if update_data.end_time is not None:
             if updated_meeting.status == MeetingStatus.UPCOMING.value:
-                scheduler_service.schedule_meeting_status_update(
+                await scheduler_service.schedule_meeting_status_update(
                     updated_meeting.id, updated_meeting.end_time
                 )
             else:
                 # Cancel job if status is no longer upcoming
-                scheduler_service.cancel_meeting_status_update(updated_meeting.id)
+                await scheduler_service.cancel_meeting_status_update(updated_meeting.id)
 
         return updated_meeting
 
@@ -277,7 +277,7 @@ class MeetingService:
             return False
 
         # Cancel scheduled job before deleting
-        scheduler_service.cancel_meeting_status_update(meeting_id)
+        await scheduler_service.cancel_meeting_status_update(meeting_id)
 
         # If this is a recurring meeting and a scope is specified, handle recurrence deletion
         if existing_meeting.recurrence_id and delete_scope:
@@ -322,7 +322,9 @@ class MeetingService:
             ]
 
             for future_meeting in future_meetings:
-                scheduler_service.cancel_meeting_status_update(future_meeting["id"])
+                await scheduler_service.cancel_meeting_status_update(
+                    future_meeting["id"]
+                )
                 await self.storage.delete(user_id, future_meeting["id"])
 
             return True
@@ -334,7 +336,7 @@ class MeetingService:
             )
 
             for all_meeting in all_meetings:
-                scheduler_service.cancel_meeting_status_update(all_meeting["id"])
+                await scheduler_service.cancel_meeting_status_update(all_meeting["id"])
                 await self.storage.delete(user_id, all_meeting["id"])
 
             return True
