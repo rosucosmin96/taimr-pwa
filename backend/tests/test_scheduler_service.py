@@ -12,14 +12,14 @@ class TestSchedulerService:
         scheduler = SchedulerService()
         assert scheduler.scheduler is not None
 
-    def test_schedule_meeting_status_update(self):
+    async def test_schedule_meeting_status_update(self):
         """Test scheduling a meeting status update."""
         scheduler = SchedulerService()
         meeting_id = uuid4()
         end_time = datetime.now(UTC) + timedelta(hours=1)
 
         # Schedule the job
-        scheduler.schedule_meeting_status_update(meeting_id, end_time)
+        await scheduler.schedule_meeting_status_update(meeting_id, end_time)
 
         # Check that job was scheduled
         job_id = f"meeting_status_update_{meeting_id}"
@@ -29,31 +29,31 @@ class TestSchedulerService:
         next_run_time = getattr(job, "next_run_time", None)
         assert next_run_time == end_time
 
-    def test_cancel_meeting_status_update(self):
+    async def test_cancel_meeting_status_update(self):
         """Test canceling a meeting status update."""
         scheduler = SchedulerService()
         meeting_id = uuid4()
         end_time = datetime.now(UTC) + timedelta(hours=1)
 
         # Schedule the job
-        scheduler.schedule_meeting_status_update(meeting_id, end_time)
+        await scheduler.schedule_meeting_status_update(meeting_id, end_time)
 
         # Cancel the job
-        scheduler.cancel_meeting_status_update(meeting_id)
+        await scheduler.cancel_meeting_status_update(meeting_id)
 
         # Check that job was removed
         job_id = f"meeting_status_update_{meeting_id}"
         job = scheduler.scheduler.get_job(job_id)
         assert job is None
 
-    def test_get_scheduled_jobs(self):
+    async def test_get_scheduled_jobs(self):
         """Test getting scheduled jobs."""
         scheduler = SchedulerService()
         meeting_id = uuid4()
         end_time = datetime.now(UTC) + timedelta(hours=1)
 
         # Schedule a job
-        scheduler.schedule_meeting_status_update(meeting_id, end_time)
+        await scheduler.schedule_meeting_status_update(meeting_id, end_time)
 
         # Get all jobs
         jobs = scheduler.get_scheduled_jobs()
@@ -65,7 +65,7 @@ class TestSchedulerService:
         ]
         assert len(meeting_jobs) == 1
 
-    def test_update_existing_job(self):
+    async def test_update_existing_job(self):
         """Test updating an existing scheduled job."""
         scheduler = SchedulerService()
         meeting_id = uuid4()
@@ -73,10 +73,10 @@ class TestSchedulerService:
         end_time2 = datetime.now(UTC) + timedelta(hours=2)
 
         # Schedule initial job
-        scheduler.schedule_meeting_status_update(meeting_id, end_time1)
+        await scheduler.schedule_meeting_status_update(meeting_id, end_time1)
 
         # Update the job with new time
-        scheduler.schedule_meeting_status_update(meeting_id, end_time2)
+        await scheduler.schedule_meeting_status_update(meeting_id, end_time2)
 
         # Check that job was updated
         job_id = f"meeting_status_update_{meeting_id}"

@@ -395,16 +395,18 @@ class SchedulerService:
                 jobstores = {"default": SQLAlchemyJobStore(url=jobstore_url)}
                 logger.info("Using SQLite for scheduler jobs in development")
             else:
-                # For production, use Supabase with custom job store
+                # For production, use MemoryJobStore with custom Supabase persistence
+                from apscheduler.jobstores.memory import MemoryJobStore
                 from supabase import create_client
 
-                supabase_client = create_client(
+                # Create Supabase client for persistence
+                self.supabase_client = create_client(
                     settings.supabase_url, settings.supabase_service_role_key
                 )
-                supabase_jobstore = SupabaseJobStore(supabase_client)
-                jobstores = {"default": supabase_jobstore}
+
+                jobstores = {"default": MemoryJobStore()}
                 logger.info(
-                    "Using Supabase with custom job store for scheduler jobs in production"
+                    "Using MemoryJobStore with Supabase persistence for scheduler jobs in production"
                 )
 
             self.scheduler = AsyncIOScheduler(
@@ -448,16 +450,26 @@ class SchedulerService:
     async def start(self):
         """Start the scheduler."""
         if self.scheduler and not self.scheduler.running:
+            # Load jobs from Supabase if in production
+            if settings.environment == "prod":
+                await self._load_jobs_from_supabase()
+
             self.scheduler.start()
             logger.info("Scheduler started successfully")
 
     async def shutdown(self):
         """Shutdown the scheduler."""
         if self.scheduler and self.scheduler.running:
+            # Save jobs to Supabase if in production
+            if settings.environment == "prod":
+                await self._save_jobs_to_supabase()
+
             self.scheduler.shutdown()
             logger.info("Scheduler shutdown successfully")
 
-    def schedule_meeting_status_update(self, meeting_id: UUID, end_time: datetime):
+    async def schedule_meeting_status_update(
+        self, meeting_id: UUID, end_time: datetime
+    ):
         """Schedule a job to update meeting status when it ends."""
         if not self.scheduler or not settings.enable_meeting_status_updates:
             return
@@ -480,7 +492,11 @@ class SchedulerService:
 
         logger.info(f"Scheduled status update for meeting {meeting_id} at {end_time}")
 
-    def cancel_meeting_status_update(self, meeting_id: UUID):
+        # Save to Supabase if in production
+        if settings.environment == "prod":
+            await self._save_jobs_to_supabase()
+
+    async def cancel_meeting_status_update(self, meeting_id: UUID):
         """Cancel a scheduled meeting status update job."""
         if not self.scheduler:
             return
@@ -489,6 +505,10 @@ class SchedulerService:
         if self.scheduler.get_job(job_id):
             self.scheduler.remove_job(job_id)
             logger.info(f"Cancelled status update for meeting {meeting_id}")
+
+            # Save to Supabase if in production
+            if settings.environment == "prod":
+                await self._save_jobs_to_supabase()
 
     def get_scheduled_jobs(self):
         """Get all scheduled jobs for debugging."""
@@ -509,6 +529,107 @@ class SchedulerService:
                 }
             )
         return jobs
+
+    async def _save_jobs_to_supabase(self):
+        """Save all jobs to Supabase."""
+        try:
+            jobs = self.scheduler.get_jobs()
+            logger.info(f"Saving {len(jobs)} jobs to Supabase")
+
+            for job in jobs:
+                job_data = {
+                    "id": job.id,
+                    "func": str(job.func),
+                    "trigger": str(job.trigger),
+                    "args": job.args,
+                    "kwargs": job.kwargs,
+                    "next_run_time": (
+                        job.next_run_time.isoformat() if job.next_run_time else None
+                    ),
+                    "misfire_grace_time": job.misfire_grace_time,
+                    "coalesce": job.coalesce,
+                    "max_instances": job.max_instances,
+                }
+
+                job_state_json = json.dumps(job_data, default=str)
+                job_state_base64 = base64.b64encode(
+                    job_state_json.encode("utf-8")
+                ).decode("utf-8")
+
+                # Use RPC function to save job
+                self.supabase_client.rpc(
+                    "add_scheduler_job",
+                    {"job_id": job.id, "job_state_base64": job_state_base64},
+                ).execute()
+
+            logger.info("Successfully saved jobs to Supabase")
+        except Exception as e:
+            logger.error(f"Error saving jobs to Supabase: {e}")
+
+    async def _load_jobs_from_supabase(self):
+        """Load all jobs from Supabase."""
+        try:
+            result = self.supabase_client.rpc("get_all_scheduler_jobs").execute()
+            logger.info(f"Loading {len(result.data)} jobs from Supabase")
+
+            for job_data in result.data:
+                try:
+                    job_state_raw = job_data["job_state"]
+
+                    # Convert Supabase BYTEA format to bytes
+                    if (
+                        isinstance(job_state_raw, dict)
+                        and job_state_raw.get("type") == "Buffer"
+                    ):
+                        job_state_bytes = bytes(job_state_raw["data"])
+                    elif isinstance(job_state_raw, str):
+                        job_state_bytes, _ = codecs.escape_decode(
+                            job_state_raw.encode("latin1")
+                        )
+                    else:
+                        job_state_bytes = job_state_raw
+
+                    # Decode JSON data
+                    job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
+                    job_data_json = json.loads(job_state_json)
+
+                    # Recreate job
+                    job_id = job_data_json.get("id")
+                    args = job_data_json.get("args", [])
+                    kwargs = job_data_json.get("kwargs", {})
+                    next_run_time_str = job_data_json.get("next_run_time")
+
+                    if next_run_time_str:
+                        next_run_time = datetime.fromisoformat(next_run_time_str)
+                    else:
+                        next_run_time = None
+
+                    # Add job to scheduler
+                    self.scheduler.add_job(
+                        func=update_meeting_status,  # Default function
+                        trigger="date",
+                        run_date=next_run_time,
+                        id=job_id,
+                        args=args,
+                        kwargs=kwargs,
+                        replace_existing=True,
+                    )
+
+                except Exception as e:
+                    logger.warning(f"Error loading job {job_data.get('id')}: {e}")
+                    # Try to delete corrupted job
+                    try:
+                        self.supabase_client.rpc(
+                            "delete_scheduler_job", {"job_id": job_data.get("id")}
+                        ).execute()
+                    except Exception as del_e:
+                        logger.debug(
+                            f"Failed to clean up job {job_data.get('id')}: {del_e}"
+                        )
+
+            logger.info("Successfully loaded jobs from Supabase")
+        except Exception as e:
+            logger.error(f"Error loading jobs from Supabase: {e}")
 
 
 def update_meeting_status(meeting_id: str):
