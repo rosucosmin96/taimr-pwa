@@ -14,6 +14,7 @@ import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import ForgotPassword from './pages/ForgotPassword';
 import ProtectedRoute from './components/ProtectedRoute';
+import AuthCallback from './components/AuthCallback';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ChakraProvider, Box, Flex, IconButton, Text, useBreakpointValue, Drawer, DrawerOverlay, DrawerContent, DrawerCloseButton, DrawerBody, VStack, Button } from '@chakra-ui/react';
 import { apiClient, Profile as UserProfile } from './lib/api';
@@ -220,6 +221,7 @@ const AppRoutes: React.FC = () => (
     <Route path="/login" element={<Login />} />
     <Route path="/signup" element={<SignUp />} />
     <Route path="/forgot-password" element={<ForgotPassword />} />
+    <Route path="/auth/callback" element={<AuthCallback />} />
 
     {/* Protected routes */}
     <Route path="/dashboard" element={
