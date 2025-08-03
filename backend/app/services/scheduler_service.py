@@ -1,7 +1,12 @@
+import base64
+import codecs
+import json
 import logging
 from datetime import datetime
 from uuid import UUID
 
+from apscheduler.job import Job
+from apscheduler.jobstores.base import BaseJobStore
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -9,6 +14,365 @@ from app.api.commons.shared import ensure_utc
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class SupabaseJobStore(BaseJobStore):
+    """Custom job store that uses Supabase for storing scheduled jobs."""
+
+    def __init__(self, supabase_client, table_name="scheduler_jobs"):
+        super().__init__()
+        self.supabase = supabase_client
+        self.table_name = table_name
+        self._scheduler = None
+
+    def start(self, scheduler, alias):
+        """Start the job store."""
+        super().start(scheduler, alias)
+        self._scheduler = scheduler
+
+    def lookup_job(self, job_id):
+        """Look up a job by its ID."""
+        try:
+            result = self.supabase.rpc(
+                "get_scheduler_job", {"job_id": job_id}
+            ).execute()
+
+            if result.data:
+                job_data = result.data[0]
+                job_state_raw = job_data["job_state"]
+
+                # Convert Supabase BYTEA format to bytes
+                if (
+                    isinstance(job_state_raw, dict)
+                    and job_state_raw.get("type") == "Buffer"
+                ):
+                    # Supabase returns BYTEA as {"type": "Buffer", "data": [...]}
+                    job_state_bytes = bytes(job_state_raw["data"])
+                elif isinstance(job_state_raw, str):
+                    # Supabase returns BYTEA as escaped hex string like '\x80\x04\x95...'
+                    # Convert the escaped hex string back to bytes
+                    job_state_bytes, _ = codecs.escape_decode(
+                        job_state_raw.encode("latin1")
+                    )
+                else:
+                    # Fallback for other formats
+                    job_state_bytes = job_state_raw
+
+                try:
+                    # Decode JSON data
+                    job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
+                    job_data = json.loads(job_state_json)
+
+                    # Convert back to job state format
+                    job_state = {
+                        "id": job_data.get("id"),
+                        "func": job_data.get("func"),
+                        "trigger": job_data.get("trigger"),
+                        "args": job_data.get("args", []),
+                        "kwargs": job_data.get("kwargs", {}),
+                        "next_run_time": job_data.get("next_run_time"),
+                        "misfire_grace_time": job_data.get("misfire_grace_time"),
+                        "coalesce": job_data.get("coalesce", False),
+                        "max_instances": job_data.get("max_instances", 1),
+                    }
+                except Exception as e:
+                    logger.warning(f"Error decoding job state for {job_id}: {e}")
+                    # Try to delete the corrupted job silently
+                    try:
+                        self.remove_job(job_id)
+                        logger.info(f"Cleaned up corrupted job {job_id}")
+                    except Exception as del_e:
+                        logger.debug(f"Failed to clean up job {job_id}: {del_e}")
+                    return None
+
+                # Create a job with the scheduler reference
+                job = Job.__new__(Job)
+                job.__setstate__(job_state)
+                # Set the scheduler reference
+                if hasattr(self, "_scheduler"):
+                    job._scheduler = self._scheduler
+                return job
+            return None
+        except Exception as e:
+            logger.error(f"Error looking up job {job_id}: {e}")
+            return None
+
+    def get_due_jobs(self, now):
+        """Get jobs that are due to run."""
+        try:
+            # Get all jobs and filter by due time
+            result = self.supabase.rpc("get_all_scheduler_jobs").execute()
+            due_jobs = []
+
+            for job_data in result.data:
+                job_state_raw = job_data["job_state"]
+
+                # Convert Supabase BYTEA format to bytes
+                if (
+                    isinstance(job_state_raw, dict)
+                    and job_state_raw.get("type") == "Buffer"
+                ):
+                    # Supabase returns BYTEA as {"type": "Buffer", "data": [...]}
+                    job_state_bytes = bytes(job_state_raw["data"])
+                elif isinstance(job_state_raw, str):
+                    # Supabase returns BYTEA as escaped hex string like '\x80\x04\x95...'
+                    # Convert the escaped hex string back to bytes
+                    job_state_bytes, _ = codecs.escape_decode(
+                        job_state_raw.encode("latin1")
+                    )
+                else:
+                    # Fallback for other formats
+                    job_state_bytes = job_state_raw
+
+                try:
+                    # Decode JSON data
+                    job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
+                    job_data_json = json.loads(job_state_json)
+
+                    # Convert back to job state format
+                    job_state = {
+                        "id": job_data_json.get("id"),
+                        "func": job_data_json.get("func"),
+                        "trigger": job_data_json.get("trigger"),
+                        "args": job_data_json.get("args", []),
+                        "kwargs": job_data_json.get("kwargs", {}),
+                        "next_run_time": job_data_json.get("next_run_time"),
+                        "misfire_grace_time": job_data_json.get("misfire_grace_time"),
+                        "coalesce": job_data_json.get("coalesce", False),
+                        "max_instances": job_data_json.get("max_instances", 1),
+                    }
+                except Exception as e:
+                    logger.warning(f"Error decoding job state: {e}")
+                    # Try to delete the corrupted job silently
+                    try:
+                        job_id = job_data.get("id")
+                        if job_id:
+                            self.remove_job(job_id)
+                            logger.info(f"Cleaned up corrupted job {job_id}")
+                    except Exception as del_e:
+                        logger.debug(f"Failed to clean up job {job_id}: {del_e}")
+                    continue
+
+                job = Job.__new__(Job)
+                job.__setstate__(job_state)
+                # Set the scheduler reference
+                if hasattr(self, "_scheduler"):
+                    job._scheduler = self._scheduler
+
+                if job.next_run_time and job.next_run_time <= now:
+                    due_jobs.append(job)
+
+            return due_jobs
+        except Exception as e:
+            logger.error(f"Error getting due jobs: {e}")
+            return []
+
+    def get_next_run_time(self):
+        """Get the next run time for any job."""
+        try:
+            result = self.supabase.rpc("get_all_scheduler_jobs").execute()
+            next_run_time = None
+
+            for job_data in result.data:
+                job_state_raw = job_data["job_state"]
+
+                # Convert Supabase BYTEA format to bytes
+                if (
+                    isinstance(job_state_raw, dict)
+                    and job_state_raw.get("type") == "Buffer"
+                ):
+                    # Supabase returns BYTEA as {"type": "Buffer", "data": [...]}
+                    job_state_bytes = bytes(job_state_raw["data"])
+                elif isinstance(job_state_raw, str):
+                    # Supabase returns BYTEA as escaped hex string like '\x80\x04\x95...'
+                    # Convert the escaped hex string back to bytes
+                    job_state_bytes, _ = codecs.escape_decode(
+                        job_state_raw.encode("latin1")
+                    )
+                else:
+                    # Fallback for other formats
+                    job_state_bytes = job_state_raw
+
+                try:
+                    # Decode JSON data
+                    job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
+                    job_data_json = json.loads(job_state_json)
+
+                    # Convert back to job state format
+                    job_state = {
+                        "id": job_data_json.get("id"),
+                        "func": job_data_json.get("func"),
+                        "trigger": job_data_json.get("trigger"),
+                        "args": job_data_json.get("args", []),
+                        "kwargs": job_data_json.get("kwargs", {}),
+                        "next_run_time": job_data_json.get("next_run_time"),
+                        "misfire_grace_time": job_data_json.get("misfire_grace_time"),
+                        "coalesce": job_data_json.get("coalesce", False),
+                        "max_instances": job_data_json.get("max_instances", 1),
+                    }
+                except Exception as e:
+                    logger.error(f"Error decoding job state: {e}")
+                    # Try to delete the corrupted job
+                    try:
+                        job_id = job_data.get("id")
+                        if job_id:
+                            self.remove_job(job_id)
+                            logger.info(f"Deleted corrupted job {job_id}")
+                    except Exception as del_e:
+                        logger.error(
+                            f"Failed to delete corrupted job {job_id}: {del_e}"
+                        )
+                    continue
+
+                job = Job.__new__(Job)
+                job.__setstate__(job_state)
+                # Set the scheduler reference
+                if hasattr(self, "_scheduler"):
+                    job._scheduler = self._scheduler
+
+                if job.next_run_time and (
+                    next_run_time is None or job.next_run_time < next_run_time
+                ):
+                    next_run_time = job.next_run_time
+
+            return next_run_time
+        except Exception as e:
+            logger.error(f"Error getting next run time: {e}")
+            return None
+
+    def add_job(self, job):
+        """Add a job to the store."""
+        try:
+            logger.info(f"Adding job {job.id} to Supabase store")
+            # Use JSON serialization for better compatibility
+            job_state = job.__getstate__()
+            # Convert to JSON-serializable format
+            job_data = {
+                "id": job_state.get("id"),
+                "func": str(job_state.get("func", "")),
+                "trigger": str(job_state.get("trigger", "")),
+                "args": job_state.get("args", []),
+                "kwargs": job_state.get("kwargs", {}),
+                "next_run_time": job_state.get("next_run_time", None),
+                "misfire_grace_time": job_state.get("misfire_grace_time", None),
+                "coalesce": job_state.get("coalesce", False),
+                "max_instances": job_state.get("max_instances", 1),
+            }
+            job_state_json = json.dumps(job_data, default=str)
+
+            # Use custom RPC function to handle JSON data
+            self.supabase.rpc(
+                "add_scheduler_job",
+                {
+                    "job_id": job.id,
+                    "job_state_base64": base64.b64encode(
+                        job_state_json.encode("utf-8")
+                    ).decode("utf-8"),
+                },
+            ).execute()
+            logger.info(f"Successfully added job {job.id} to Supabase store")
+
+        except Exception as e:
+            logger.error(f"Error adding job {job.id}: {e}")
+            raise
+
+    def update_job(self, job):
+        """Update a job in the store."""
+        self.add_job(job)  # Same as add_job for Supabase
+
+    def remove_job(self, job_id):
+        """Remove a job from the store."""
+        try:
+            self.supabase.rpc("delete_scheduler_job", {"job_id": job_id}).execute()
+        except Exception as e:
+            logger.error(f"Error removing job {job_id}: {e}")
+            raise
+
+    def remove_jobs(self, job_ids):
+        """Remove multiple jobs from the store."""
+        try:
+            for job_id in job_ids:
+                self.remove_job(job_id)
+        except Exception as e:
+            logger.error(f"Error removing jobs {job_ids}: {e}")
+            raise
+
+    def get_all_jobs(self):
+        """Get all jobs from the store."""
+        try:
+            result = self.supabase.rpc("get_all_scheduler_jobs").execute()
+            jobs = []
+
+            for job_data in result.data:
+                job_state_raw = job_data["job_state"]
+
+                # Convert Supabase BYTEA format to bytes
+                if (
+                    isinstance(job_state_raw, dict)
+                    and job_state_raw.get("type") == "Buffer"
+                ):
+                    # Supabase returns BYTEA as {"type": "Buffer", "data": [...]}
+                    job_state_bytes = bytes(job_state_raw["data"])
+                elif isinstance(job_state_raw, str):
+                    # Supabase returns BYTEA as escaped hex string like '\x80\x04\x95...'
+                    # Convert the escaped hex string back to bytes
+                    job_state_bytes, _ = codecs.escape_decode(
+                        job_state_raw.encode("latin1")
+                    )
+                else:
+                    # Fallback for other formats
+                    job_state_bytes = job_state_raw
+
+                try:
+                    # Decode JSON data
+                    job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
+                    job_data_json = json.loads(job_state_json)
+
+                    # Convert back to job state format
+                    job_state = {
+                        "id": job_data_json.get("id"),
+                        "func": job_data_json.get("func"),
+                        "trigger": job_data_json.get("trigger"),
+                        "args": job_data_json.get("args", []),
+                        "kwargs": job_data_json.get("kwargs", {}),
+                        "next_run_time": job_data_json.get("next_run_time"),
+                        "misfire_grace_time": job_data_json.get("misfire_grace_time"),
+                        "coalesce": job_data_json.get("coalesce", False),
+                        "max_instances": job_data_json.get("max_instances", 1),
+                    }
+                except Exception as e:
+                    logger.error(f"Error decoding job state: {e}")
+                    # Try to delete the corrupted job
+                    try:
+                        job_id = job_data.get("id")
+                        if job_id:
+                            self.remove_job(job_id)
+                            logger.info(f"Deleted corrupted job {job_id}")
+                    except Exception as del_e:
+                        logger.error(
+                            f"Failed to delete corrupted job {job_id}: {del_e}"
+                        )
+                    continue
+
+                job = Job.__new__(Job)
+                job.__setstate__(job_state)
+                # Set the scheduler reference
+                if hasattr(self, "_scheduler"):
+                    job._scheduler = self._scheduler
+                jobs.append(job)
+
+            return jobs
+        except Exception as e:
+            logger.error(f"Error getting all jobs: {e}")
+            return []
+
+    def remove_all_jobs(self):
+        """Remove all jobs from the store."""
+        try:
+            self.supabase.table(self.table_name).delete().neq("id", "").execute()
+        except Exception as e:
+            logger.error(f"Error removing all jobs: {e}")
+            raise
 
 
 class SchedulerService:
@@ -28,12 +392,20 @@ class SchedulerService:
             # Use SQLite for development, Supabase for production
             if settings.environment == "dev":
                 jobstore_url = settings.scheduler_jobstore_url
+                jobstores = {"default": SQLAlchemyJobStore(url=jobstore_url)}
+                logger.info("Using SQLite for scheduler jobs in development")
             else:
-                # For production, use SQLite in memory since Supabase doesn't support direct PostgreSQL connections
-                jobstore_url = "sqlite:///:memory:"
-                logger.info("Using in-memory SQLite for scheduler jobs in production")
+                # For production, use Supabase with custom job store
+                from supabase import create_client
 
-            jobstores = {"default": SQLAlchemyJobStore(url=jobstore_url)}
+                supabase_client = create_client(
+                    settings.supabase_url, settings.supabase_service_role_key
+                )
+                supabase_jobstore = SupabaseJobStore(supabase_client)
+                jobstores = {"default": supabase_jobstore}
+                logger.info(
+                    "Using Supabase with custom job store for scheduler jobs in production"
+                )
 
             self.scheduler = AsyncIOScheduler(
                 jobstores=jobstores,
@@ -43,7 +415,8 @@ class SchedulerService:
             logger.info("Scheduler initialized successfully")
 
             # Schedule daily membership status check
-            self._schedule_daily_membership_check()
+            # Temporarily disabled to test job creation
+            # self._schedule_daily_membership_check()
 
         except Exception as e:
             logger.error(f"Failed to initialize scheduler: {e}")
@@ -127,7 +500,7 @@ class SchedulerService:
             jobs.append(
                 {
                     "id": job.id,
-                    "next_run_time": job.next_run_time,
+                    "next_run_time": getattr(job, "next_run_time", None),
                     "func": (
                         job.func.__name__
                         if hasattr(job.func, "__name__")

@@ -25,7 +25,9 @@ class TestSchedulerService:
         job_id = f"meeting_status_update_{meeting_id}"
         job = scheduler.scheduler.get_job(job_id)
         assert job is not None
-        assert job.next_run_time == end_time
+        # Use getattr to safely access next_run_time
+        next_run_time = getattr(job, "next_run_time", None)
+        assert next_run_time == end_time
 
     def test_cancel_meeting_status_update(self):
         """Test canceling a meeting status update."""
@@ -55,8 +57,13 @@ class TestSchedulerService:
 
         # Get all jobs
         jobs = scheduler.get_scheduled_jobs()
-        assert len(jobs) == 1
-        assert jobs[0]["id"] == f"meeting_status_update_{meeting_id}"
+        # There should be at least 1 job (the daily membership check is also scheduled)
+        assert len(jobs) >= 1
+        # Find our specific job
+        meeting_jobs = [
+            j for j in jobs if j["id"] == f"meeting_status_update_{meeting_id}"
+        ]
+        assert len(meeting_jobs) == 1
 
     def test_update_existing_job(self):
         """Test updating an existing scheduled job."""
@@ -75,8 +82,13 @@ class TestSchedulerService:
         job_id = f"meeting_status_update_{meeting_id}"
         job = scheduler.scheduler.get_job(job_id)
         assert job is not None
-        assert job.next_run_time == end_time2
+        # Use getattr to safely access next_run_time
+        next_run_time = getattr(job, "next_run_time", None)
+        assert next_run_time == end_time2
 
-        # Check that only one job exists
+        # Check that only one meeting job exists (plus the daily membership check)
         jobs = scheduler.get_scheduled_jobs()
-        assert len(jobs) == 1
+        meeting_jobs = [
+            j for j in jobs if j["id"] == f"meeting_status_update_{meeting_id}"
+        ]
+        assert len(meeting_jobs) == 1
