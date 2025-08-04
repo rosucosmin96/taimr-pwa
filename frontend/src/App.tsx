@@ -13,6 +13,7 @@ import Notifications from './pages/Notifications';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import ForgotPassword from './pages/ForgotPassword';
+import LandingPage from './pages/LandingPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import AuthCallback from './components/AuthCallback';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -238,9 +239,31 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   );
 };
 
+// Component to handle root route logic
+const RootRoute: React.FC = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
+        <Text>Loading...</Text>
+      </Box>
+    );
+  }
+
+  // If user is authenticated, redirect to dashboard
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // If not authenticated, show landing page
+  return <LandingPage />;
+};
+
 const AppRoutes: React.FC = () => (
   <Routes>
     {/* Public routes */}
+    <Route path="/" element={<RootRoute />} />
     <Route path="/login" element={<Login />} />
     <Route path="/signup" element={<SignUp />} />
     <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -310,9 +333,6 @@ const AppRoutes: React.FC = () => (
         </AppLayout>
       </ProtectedRoute>
     } />
-
-    {/* Default redirect */}
-    <Route path="/" element={<Navigate to="/dashboard" replace />} />
   </Routes>
 );
 
