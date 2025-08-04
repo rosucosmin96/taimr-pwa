@@ -1,7 +1,20 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="128" fill="#805AD5"/>
-  <path d="M128 160h256v256H128V160zm32 32v192h192V192H160z" fill="white"/>
-  <path d="M160 128h32v32h-32v-32zm160 0h32v32h-32v-32zM160 416h192v32H160v-32z" fill="white"/>
-  <circle cx="256" cy="288" r="32" fill="white"/>
-  <path d="M240 272h32v32h-32v-32z" fill="#805AD5"/>
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded background -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGradient)"/>
+
+  <!-- Big, serious white "T" letter mark -->
+  <g transform="translate(256, 256)">
+    <!-- Vertical stroke of T (thicker and taller) -->
+    <rect x="-20" y="-120" width="40" height="240" rx="20" fill="white"/>
+    <!-- Horizontal stroke of T (wider and thicker) -->
+    <rect x="-100" y="-120" width="200" height="40" rx="20" fill="white"/>
+  </g>
 </svg>
