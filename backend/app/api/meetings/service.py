@@ -375,9 +375,7 @@ class MeetingService:
                 # Set the start date if not already set (regardless of payment status)
                 if not membership.get("start_date"):
                     await self.membership_storage.update(
-                        user_id=user_id,
-                        entity_id=membership_id,
-                        update_data={"start_date": start_date},
+                        user_id, membership_id, {"start_date": start_date}
                     )
                     logger.info(
                         f"Set start date for membership {membership_id} to {start_date}"

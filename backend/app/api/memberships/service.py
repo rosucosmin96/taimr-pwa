@@ -154,6 +154,21 @@ class MembershipService:
             for meeting in meetings
         ]
 
+    async def get_membership_progress(self, user_id: UUID, membership_id: UUID) -> dict:
+        """Get membership progress (completed meetings vs total meetings)."""
+        membership = await self.storage.get_by_id(user_id, membership_id)
+        if not membership:
+            raise ValueError("Membership not found")
+
+        done_meetings_count = await self._get_done_meetings_count(str(membership_id))
+
+        return {
+            "membership_id": str(membership_id),
+            "total_meetings": membership.total_meetings,
+            "completed_meetings": done_meetings_count,
+            "remaining_meetings": membership.total_meetings - done_meetings_count,
+        }
+
     async def update_membership_status(self, user_id: UUID) -> None:
         """Update membership status based on expiration rules."""
         memberships = await self.storage.get_all(
@@ -227,9 +242,7 @@ class MembershipService:
 
                 # Update the membership start date
                 await self.storage.update(
-                    user_id=user_id,
-                    entity_id=membership_id,
-                    update_data={"start_date": start_date},
+                    user_id, membership_id, {"start_date": start_date}
                 )
                 logger.info(
                     f"Manually set start date for membership {membership_id} to {start_date}"
@@ -304,9 +317,7 @@ class MembershipService:
                 # Update each meeting's paid status
                 for meeting in meetings:
                     await self.meeting_storage.update(
-                        user_id=user_id,
-                        entity_id=meeting["id"],
-                        update_data={"paid": paid},
+                        user_id, meeting["id"], {"paid": paid}
                     )
 
                 logger.info(

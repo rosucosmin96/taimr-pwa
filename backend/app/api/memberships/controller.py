@@ -100,6 +100,19 @@ async def get_membership_meetings(
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
+@router.get("/{membership_id}/progress")
+async def get_membership_progress(
+    membership_id: UUID,
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """Get membership progress (completed meetings vs total meetings)."""
+    service = MembershipService()
+    try:
+        return await service.get_membership_progress(user_id, membership_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
 @router.post("/{membership_id}/set-start-date")
 async def set_membership_start_date(
     membership_id: UUID,
