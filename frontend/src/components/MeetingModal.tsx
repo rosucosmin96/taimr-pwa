@@ -24,7 +24,7 @@ import {
   Box,
   Badge,
 } from '@chakra-ui/react';
-import { apiClient, Service, Client, Membership } from '../lib/api';
+import { apiClient, Service, Client, Membership, MembershipProgress } from '../lib/api';
 
 interface MeetingModalProps {
   isOpen: boolean;
@@ -48,6 +48,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
   const [services, setServices] = useState<Service[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [activeMembership, setActiveMembership] = useState<Membership | null>(null);
+  const [membershipProgress, setMembershipProgress] = useState<MembershipProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -175,6 +176,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
   useEffect(() => {
     if (!clientId) {
       setActiveMembership(null);
+      setMembershipProgress(null);
       setUseMembership(false);
       return;
     }
@@ -182,6 +184,18 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
     apiClient.getActiveMembership(clientId).then((membership) => {
       setActiveMembership(membership);
       setUseMembership(false); // Default to not using membership
+
+      // Fetch membership progress if membership exists
+      if (membership) {
+        apiClient.getMembershipProgress(membership.id).then((progress) => {
+          setMembershipProgress(progress);
+        }).catch((error) => {
+          console.error('Failed to fetch membership progress:', error);
+          setMembershipProgress(null);
+        });
+      } else {
+        setMembershipProgress(null);
+      }
     });
   }, [clientId]);
 
@@ -345,7 +359,10 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
                       <Badge colorScheme="purple">{activeMembership.name}</Badge>
                     </Flex>
                     <Text fontSize="sm" color="purple.600" mb={3}>
-                      {activeMembership.total_meetings} meetings • ${activeMembership.price_per_meeting} per meeting
+                      {membershipProgress ?
+                        `${membershipProgress.completed_meetings}/${membershipProgress.total_meetings} meetings` :
+                        `${activeMembership.total_meetings} meetings`
+                      } • ${activeMembership.price_per_meeting} per meeting
                     </Text>
                     <Checkbox
                       isChecked={useMembership}

@@ -161,6 +161,13 @@ export interface MembershipUpdateRequest {
   paid?: boolean;
 }
 
+export interface MembershipProgress {
+  membership_id: string;
+  total_meetings: number;
+  completed_meetings: number;
+  remaining_meetings: number;
+}
+
 export interface ClientStats {
   client_id: string;
   client_name: string;
@@ -483,6 +490,10 @@ class ApiClient {
 
   async getMembershipMeetings(membershipId: string): Promise<Meeting[]> {
     return this.request<Meeting[]>(`/memberships/${membershipId}/meetings`);
+  }
+
+  async getMembershipProgress(membershipId: string): Promise<MembershipProgress> {
+    return this.request<MembershipProgress>(`/memberships/${membershipId}/progress`);
   }
 
   // Notifications API

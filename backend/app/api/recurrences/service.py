@@ -4,15 +4,13 @@ from uuid import UUID, uuid4
 
 from app.api.commons.shared import RecurrenceUpdateScope, ensure_utc
 from app.api.meetings.model import MeetingCreateRequest, MeetingResponse, MeetingStatus
+from app.api.meetings.service import MeetingService
 from app.api.recurrences.model import (
     RecurrenceCreateRequest,
     RecurrenceException,
     RecurrenceFrequency,
     RecurrenceResponse,
     RecurrenceUpdateRequest,
-)
-from app.models import (
-    Meeting as MeetingModel,
 )
 from app.models import (
     Recurrence as RecurrenceModel,
@@ -29,12 +27,8 @@ class RecurrenceService:
             response_class=RecurrenceResponse,
             table_name="recurrences",
         )
-        # Create separate storage for meetings (needed for business logic)
-        self.meeting_storage = StorageFactory.create_storage_service(
-            model_class=MeetingModel,
-            response_class=None,  # We'll handle responses manually
-            table_name="meetings",
-        )
+        # Use MeetingService for meeting operations
+        self.meeting_service = MeetingService()
 
     def _generate_meeting_instances(
         self, recurrence: RecurrenceResponse, start_date: datetime, end_date: datetime
@@ -123,28 +117,10 @@ class RecurrenceService:
         # Create all the meeting instances
         created_meetings = []
         for instance in instances:
-            # Create meeting using the meeting storage directly
-            meeting_data = {
-                "id": str(uuid4()),
-                "service_id": str(instance.service_id),
-                "client_id": str(instance.client_id),
-                "title": instance.title,
-                "recurrence_id": str(instance.recurrence_id),
-                "start_time": ensure_utc(instance.start_time),
-                "end_time": ensure_utc(instance.end_time),
-                "price_per_hour": instance.price_per_hour,
-                "price_total": (instance.end_time - instance.start_time).total_seconds()
-                / 3600
-                * instance.price_per_hour,
-                "status": (
-                    instance.status.value
-                    if hasattr(instance.status, "value")
-                    else instance.status
-                ),
-                "paid": instance.paid,
-            }
-
-            created_meeting = await self.meeting_storage.create(user_id, meeting_data)
+            # Create meeting using MeetingService to ensure all business logic is applied
+            created_meeting = await self.meeting_service.create_meeting(
+                user_id, instance
+            )
             created_meetings.append(created_meeting)
 
         return created_recurrence
@@ -196,12 +172,12 @@ class RecurrenceService:
             return False
 
         # Delete all associated meetings
-        meetings = await self.meeting_storage.get_all(
-            user_id, {"recurrence_id": str(recurrence_id)}
+        meetings = await self.meeting_service.get_recurring_meetings(
+            user_id, recurrence_id
         )
 
         for meeting in meetings:
-            await self.meeting_storage.delete(user_id, meeting["id"])
+            await self.meeting_service.delete_meeting(user_id, meeting.id)
 
         # Delete the recurrence
         success = await self.storage.delete(user_id, recurrence_id)
@@ -211,9 +187,7 @@ class RecurrenceService:
         self, user_id: UUID, recurrence_id: UUID
     ) -> list[MeetingResponse]:
         """Get all meetings for a specific recurrence"""
-        return await self.meeting_storage.get_all(
-            user_id, {"recurrence_id": str(recurrence_id)}
-        )
+        return await self.meeting_service.get_recurring_meetings(user_id, recurrence_id)
 
     async def update_recurring_meeting(
         self,
@@ -223,81 +197,12 @@ class RecurrenceService:
         update_scope: RecurrenceUpdateScope,
     ) -> list[MeetingResponse]:
         """Update a recurring meeting based on the specified scope"""
-        try:
-            # Get the meeting to find its recurrence_id
-            meeting = await self.meeting_storage.get_by_id(user_id, meeting_id)
-            if not meeting:
-                raise ValueError("Meeting not found")
-
-            recurrence_id = meeting.get("recurrence_id")
-            if not recurrence_id:
-                raise ValueError("Meeting is not part of a recurrence")
-
-            updated_meetings = []
-
-            if update_scope == RecurrenceUpdateScope.THIS_MEETING_ONLY:
-                # Update only this specific meeting
-                updated_meeting = await self.meeting_storage.update(
-                    user_id, meeting_id, update_data
-                )
-                if updated_meeting:
-                    updated_meetings.append(updated_meeting)
-
-            elif update_scope == RecurrenceUpdateScope.THIS_AND_FUTURE:
-                # Update this meeting and all future meetings in the recurrence
-                # First update this meeting
-                updated_meeting = await self.meeting_storage.update(
-                    user_id, meeting_id, update_data
-                )
-                if updated_meeting:
-                    updated_meetings.append(updated_meeting)
-
-                # Get all future meetings in the same recurrence
-                future_meetings = await self.meeting_storage.get_all(
-                    user_id,
-                    {
-                        "recurrence_id": str(recurrence_id),
-                        "status": MeetingStatus.UPCOMING.value,
-                    },
-                )
-
-                # Filter for meetings after the current one
-                future_meetings = [
-                    m
-                    for m in future_meetings
-                    if m["start_time"] > meeting["start_time"]
-                ]
-
-                # Update each future meeting
-                for future_meeting in future_meetings:
-                    updated_future_meeting = await self.meeting_storage.update(
-                        user_id, future_meeting["id"], update_data
-                    )
-                    if updated_future_meeting:
-                        updated_meetings.append(updated_future_meeting)
-
-            elif update_scope == RecurrenceUpdateScope.ALL_MEETINGS:
-                # Update all meetings in the recurrence (including past ones)
-                all_meetings = await self.meeting_storage.get_all(
-                    user_id, {"recurrence_id": str(recurrence_id)}
-                )
-
-                # Update each meeting
-                for meeting_to_update in all_meetings:
-                    updated_meeting = await self.meeting_storage.update(
-                        user_id, meeting_to_update["id"], update_data
-                    )
-                    if updated_meeting:
-                        updated_meetings.append(updated_meeting)
-
-            logger.info(
-                f"Updated {len(updated_meetings)} meetings for recurrence {recurrence_id} with scope {update_scope.value}"
-            )
-            return updated_meetings
-
-        except Exception as e:
-            logger.error(f"Failed to update recurring meeting {meeting_id}: {e}")
-            raise
+        # This method is deprecated. Use MeetingService.update_meeting() instead.
+        # The MeetingService already handles recurring meeting updates with scope.
+        raise NotImplementedError(
+            "Use MeetingService.update_meeting() for recurring meeting updates. "
+            "This method is deprecated."
+        )
 
     async def create_recurrence_exception(
         self,

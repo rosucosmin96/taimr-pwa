@@ -183,10 +183,10 @@ class MeetingService:
             # Get current meeting data to calculate new price
             current_meeting = await self.storage.get_by_id(user_id, meeting_id)
             if current_meeting:
-                start_time = update_data.start_time or current_meeting["start_time"]
-                end_time = update_data.end_time or current_meeting["end_time"]
+                start_time = update_data.start_time or current_meeting.start_time
+                end_time = update_data.end_time or current_meeting.end_time
                 price_per_hour = (
-                    update_data.price_per_hour or current_meeting["price_per_hour"]
+                    update_data.price_per_hour or current_meeting.price_per_hour
                 )
 
                 duration_hours = (end_time - start_time).total_seconds() / 3600
@@ -240,12 +240,12 @@ class MeetingService:
 
             # Filter for meetings after the current one
             future_meetings = [
-                m for m in future_meetings if m["start_time"] > meeting.start_time
+                m for m in future_meetings if m.start_time > meeting.start_time
             ]
 
             for future_meeting in future_meetings:
                 await self._update_single_meeting(
-                    user_id, future_meeting["id"], update_data
+                    user_id, future_meeting.id, update_data
                 )
 
             return updated_meeting
@@ -257,9 +257,7 @@ class MeetingService:
             )
 
             for all_meeting in all_meetings:
-                await self._update_single_meeting(
-                    user_id, all_meeting["id"], update_data
-                )
+                await self._update_single_meeting(user_id, all_meeting.id, update_data)
 
             return await self._update_single_meeting(user_id, meeting.id, update_data)
 
@@ -318,14 +316,12 @@ class MeetingService:
 
             # Filter for meetings after the current one
             future_meetings = [
-                m for m in future_meetings if m["start_time"] > meeting.start_time
+                m for m in future_meetings if m.start_time > meeting.start_time
             ]
 
             for future_meeting in future_meetings:
-                await scheduler_service.cancel_meeting_status_update(
-                    future_meeting["id"]
-                )
-                await self.storage.delete(user_id, future_meeting["id"])
+                await scheduler_service.cancel_meeting_status_update(future_meeting.id)
+                await self.storage.delete(user_id, future_meeting.id)
 
             return True
 
@@ -336,8 +332,8 @@ class MeetingService:
             )
 
             for all_meeting in all_meetings:
-                await scheduler_service.cancel_meeting_status_update(all_meeting["id"])
-                await self.storage.delete(user_id, all_meeting["id"])
+                await scheduler_service.cancel_meeting_status_update(all_meeting.id)
+                await self.storage.delete(user_id, all_meeting.id)
 
             return True
 
@@ -375,9 +371,7 @@ class MeetingService:
                 # Set the start date if not already set (regardless of payment status)
                 if not membership.get("start_date"):
                     await self.membership_storage.update(
-                        user_id=user_id,
-                        entity_id=membership_id,
-                        update_data={"start_date": start_date},
+                        user_id, membership_id, {"start_date": start_date}
                     )
                     logger.info(
                         f"Set start date for membership {membership_id} to {start_date}"

@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.api.commons.shared import RecurrenceUpdateScope
+
 
 class MeetingStatus(str, Enum):
     UPCOMING = "upcoming"
@@ -47,6 +49,7 @@ class MeetingUpdateRequest(BaseModel):
     price_per_hour: float | None = Field(None, ge=0.0)
     status: MeetingStatus | None = None
     paid: bool | None = None
+    update_scope: RecurrenceUpdateScope | None = None
 
 
 class MeetingResponse(MeetingBase):

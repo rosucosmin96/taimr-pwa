@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from app.api.memberships.model import (
@@ -154,6 +154,21 @@ class MembershipService:
             for meeting in meetings
         ]
 
+    async def get_membership_progress(self, user_id: UUID, membership_id: UUID) -> dict:
+        """Get membership progress (completed meetings vs total meetings)."""
+        membership = await self.storage.get_by_id(user_id, membership_id)
+        if not membership:
+            raise ValueError("Membership not found")
+
+        done_meetings_count = await self._get_done_meetings_count(str(membership_id))
+
+        return {
+            "membership_id": str(membership_id),
+            "total_meetings": membership.total_meetings,
+            "completed_meetings": done_meetings_count,
+            "remaining_meetings": membership.total_meetings - done_meetings_count,
+        }
+
     async def update_membership_status(self, user_id: UUID) -> None:
         """Update membership status based on expiration rules."""
         memberships = await self.storage.get_all(
@@ -166,46 +181,47 @@ class MembershipService:
             should_notify_expiring = False
 
             # Check time-based expiration
-            if membership["start_date"]:
-                expiration_date = membership["start_date"] + timedelta(
-                    days=membership["availability_days"]
+            if membership.start_date:
+                expiration_date = membership.start_date + timedelta(
+                    days=membership.availability_days
                 )
-                if datetime.now() > expiration_date:
+                now = datetime.now(UTC)
+                if now > expiration_date:
                     should_expire = True
-                elif datetime.now() > expiration_date - timedelta(days=7):
+                elif now > expiration_date - timedelta(days=7):
                     should_notify_availability = True
 
             # Check meeting count-based expiration
             if not should_expire:
                 done_meetings_count = await self._get_done_meetings_count(
-                    str(membership["id"])
+                    str(membership.id)
                 )
 
-                if done_meetings_count >= membership["total_meetings"]:
+                if done_meetings_count >= membership.total_meetings:
                     should_expire = True
-                elif membership["total_meetings"] - done_meetings_count == 1:
+                elif membership.total_meetings - done_meetings_count == 1:
                     should_notify_expiring = True
 
             if should_expire:
                 await self.storage.update(
                     user_id,
-                    membership["id"],
+                    membership.id,
                     {"status": MembershipStatus.EXPIRED.value},
                 )
             elif should_notify_availability:
                 await self._create_notification(
-                    user_id=membership["user_id"],
-                    title=f"Membership {membership['name']} Expiring Soon",
-                    message=f"Your membership for {membership['name']} is expiring on {membership['start_date'] + timedelta(days=membership['availability_days'])}.",
-                    related_entity_id=membership["id"],
+                    user_id=membership.user_id,
+                    title=f"Membership {membership.name} Expiring Soon",
+                    message=f"Your membership for {membership.name} is expiring on {membership.start_date + timedelta(days=membership.availability_days)}.",
+                    related_entity_id=membership.id,
                     related_entity_type="membership",
                 )
             elif should_notify_expiring:
                 await self._create_notification(
-                    user_id=membership["user_id"],
-                    title=f"Membership {membership['name']} Expiring Soon",
-                    message=f"Your membership for {membership['name']} has only one meeting left.",
-                    related_entity_id=membership["id"],
+                    user_id=membership.user_id,
+                    title=f"Membership {membership.name} Expiring Soon",
+                    message=f"Your membership for {membership.name} has only one meeting left.",
+                    related_entity_id=membership.id,
                     related_entity_type="membership",
                 )
 
@@ -227,9 +243,7 @@ class MembershipService:
 
                 # Update the membership start date
                 await self.storage.update(
-                    user_id=user_id,
-                    entity_id=membership_id,
-                    update_data={"start_date": start_date},
+                    user_id, membership_id, {"start_date": start_date}
                 )
                 logger.info(
                     f"Manually set start date for membership {membership_id} to {start_date}"
@@ -304,9 +318,7 @@ class MembershipService:
                 # Update each meeting's paid status
                 for meeting in meetings:
                     await self.meeting_storage.update(
-                        user_id=user_id,
-                        entity_id=meeting["id"],
-                        update_data={"paid": paid},
+                        user_id, meeting["id"], {"paid": paid}
                     )
 
                 logger.info(
