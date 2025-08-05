@@ -83,12 +83,18 @@ async def update_recurring_meeting(
     user_id: UUID = Depends(get_current_user_id),
 ):
     """Update a recurring meeting based on the specified scope"""
-    service = RecurrenceService()
+    # Use MeetingService for recurring meeting updates
+    from app.api.meetings.model import MeetingUpdateRequest
+    from app.api.meetings.service import MeetingService
+
+    service = MeetingService()
     try:
-        updated_meetings = await service.update_recurring_meeting(
-            user_id, meeting_id, update_data, update_scope
+        # Convert dict to MeetingUpdateRequest and add update_scope
+        update_request = MeetingUpdateRequest(**update_data, update_scope=update_scope)
+        updated_meeting = await service.update_meeting(
+            user_id, meeting_id, update_request
         )
-        return updated_meetings
+        return updated_meeting
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
