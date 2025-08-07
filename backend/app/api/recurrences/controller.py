@@ -28,14 +28,27 @@ async def get_recurrence(
     return recurrence
 
 
-@router.post("/", response_model=RecurrenceResponse)
+@router.post("/", response_model=dict)
 async def create_recurrence(
     recurrence: RecurrenceCreateRequest,
     user_id: UUID = Depends(get_current_user_id),
 ):
-    """Create a new recurrence and generate future meetings"""
+    """Create a new recurrence and generate future meetings, respecting membership limits"""
     service = RecurrenceService()
-    return await service.create_recurrence(user_id, recurrence)
+    result = await service.create_recurrence_with_membership_check(user_id, recurrence)
+
+    # Return detailed response with limitation information
+    response = {
+        "recurrence": result["recurrence"],
+        "meetings_created": result["meetings_created"],
+        "membership_used": result["membership_used"],
+    }
+
+    if result["limitation_info"]:
+        response["limitation_info"] = result["limitation_info"]
+        response["message"] = result["limitation_info"]["message"]
+
+    return response
 
 
 @router.put("/{recurrence_id}", response_model=RecurrenceResponse)
@@ -83,23 +96,44 @@ async def update_recurring_meeting(
     user_id: UUID = Depends(get_current_user_id),
 ):
     """Update a recurring meeting based on the specified scope"""
-    # Use MeetingService for recurring meeting updates
-    from app.api.meetings.model import MeetingUpdateRequest
-    from app.api.meetings.service import MeetingService
-
-    service = MeetingService()
+    service = RecurrenceService()
     try:
         # Convert dict to MeetingUpdateRequest and add update_scope
+        from app.api.meetings.model import MeetingUpdateRequest
+
         update_request = MeetingUpdateRequest(**update_data, update_scope=update_scope)
-        updated_meeting = await service.update_meeting(
+
+        # Use RecurrenceService to handle the update
+        updated_meetings = await service.update_recurring_meeting(
             user_id, meeting_id, update_request
         )
-        return updated_meeting
+
+        return updated_meetings
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to update recurring meeting: {str(e)}"
+        ) from e
+
+
+@router.delete("/meetings/{meeting_id}")
+async def delete_recurring_meeting(
+    meeting_id: UUID,
+    delete_scope: RecurrenceUpdateScope,
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """Delete a recurring meeting based on the specified scope"""
+    service = RecurrenceService()
+    try:
+        # Use RecurrenceService to handle the deletion
+        await service.delete_recurring_meeting(user_id, meeting_id, delete_scope)
+        return {"message": "Recurring meeting deleted successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete recurring meeting: {str(e)}"
         ) from e
 
 

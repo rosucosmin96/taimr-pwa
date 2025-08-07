@@ -218,6 +218,61 @@ class MeetingService:
         ]:
             raise ValueError(f"Invalid update_scope: {update_data.update_scope}")
 
+        # Calculate time offsets if time fields are being updated
+        time_offset_start = None
+        time_offset_end = None
+
+        if update_data.start_time is not None or update_data.end_time is not None:
+            # Get the recurrence to find the original times
+            from app.api.recurrences.service import RecurrenceService
+
+            recurrence_service = RecurrenceService()
+            recurrence = await recurrence_service.get_recurrence(
+                user_id, meeting.recurrence_id
+            )
+
+            if recurrence:
+                # Convert recurrence time strings to datetime for comparison
+                # Use the meeting's date with the recurrence's time
+                meeting_date = meeting.start_time.date()
+                from datetime import time
+
+                # Parse recurrence times
+                recurrence_start_time = time.fromisoformat(recurrence.start_time)
+                recurrence_end_time = time.fromisoformat(recurrence.end_time)
+
+                # Create datetime objects using meeting date and recurrence times
+                original_start = datetime.combine(meeting_date, recurrence_start_time)
+                original_end = datetime.combine(meeting_date, recurrence_end_time)
+
+                # Make sure the pattern times have the same timezone as the update data
+                if update_data.start_time and update_data.start_time.tzinfo:
+                    original_start = original_start.replace(
+                        tzinfo=update_data.start_time.tzinfo
+                    )
+                if update_data.end_time and update_data.end_time.tzinfo:
+                    original_end = original_end.replace(
+                        tzinfo=update_data.end_time.tzinfo
+                    )
+
+                new_start = update_data.start_time or original_start
+                new_end = update_data.end_time or original_end
+
+                # Calculate the time differences (offsets)
+                time_offset_start = new_start - original_start
+                time_offset_end = new_end - original_end
+            else:
+                # Fallback to current meeting times if recurrence not found
+                original_start = meeting.start_time
+                original_end = meeting.end_time
+
+                new_start = update_data.start_time or original_start
+                new_end = update_data.end_time or original_end
+
+                # Calculate the time differences (offsets)
+                time_offset_start = new_start - original_start
+                time_offset_end = new_end - original_end
+
         if update_data.update_scope == RecurrenceUpdateScope.THIS_MEETING_ONLY.value:
             # Update only this meeting
             return await self._update_single_meeting(user_id, meeting.id, update_data)
@@ -229,35 +284,153 @@ class MeetingService:
                 user_id, meeting.id, update_data
             )
 
-            # Find and update all future meetings in the same recurrence
-            future_meetings = await self.storage.get_all(
-                user_id,
-                {
-                    "recurrence_id": str(meeting.recurrence_id),
-                    "status": MeetingStatus.UPCOMING.value,
-                },
+            # Get the original recurrence times to identify which meetings to update
+            from app.api.recurrences.service import RecurrenceService
+
+            recurrence_service = RecurrenceService()
+            recurrence = await recurrence_service.get_recurrence(
+                user_id, meeting.recurrence_id
             )
 
-            # Filter for meetings after the current one
-            future_meetings = [
-                m for m in future_meetings if m.start_time > meeting.start_time
-            ]
+            if recurrence:
+                # Convert recurrence times to datetime for comparison
+                meeting_date = meeting.start_time.date()
+                from datetime import time
 
-            for future_meeting in future_meetings:
-                await self._update_single_meeting(
-                    user_id, future_meeting.id, update_data
+                recurrence_start_time = time.fromisoformat(recurrence.start_time)
+                recurrence_end_time = time.fromisoformat(recurrence.end_time)
+
+                # Create datetime objects for the original pattern times
+                original_pattern_start = datetime.combine(
+                    meeting_date, recurrence_start_time
                 )
+                original_pattern_end = datetime.combine(
+                    meeting_date, recurrence_end_time
+                )
+
+                # Find and update all future meetings in the same recurrence
+                future_meetings = await self.storage.get_all(
+                    user_id,
+                    {
+                        "recurrence_id": str(meeting.recurrence_id),
+                        "status": MeetingStatus.UPCOMING.value,
+                    },
+                )
+
+                # Filter for meetings after the current one AND that match the original pattern
+                future_meetings = [
+                    m
+                    for m in future_meetings
+                    if m.start_time > meeting.start_time
+                    and abs((m.start_time - original_pattern_start).total_seconds())
+                    < 60  # Within 1 minute
+                    and abs((m.end_time - original_pattern_end).total_seconds())
+                    < 60  # Within 1 minute
+                ]
+
+                for _i, future_meeting in enumerate(future_meetings):
+                    # Create update data with time offsets applied
+                    future_update_data = MeetingUpdateRequest(
+                        service_id=update_data.service_id,
+                        client_id=update_data.client_id,
+                        title=update_data.title,
+                        recurrence_id=update_data.recurrence_id,
+                        membership_id=update_data.membership_id,
+                        price_per_hour=update_data.price_per_hour,
+                        status=update_data.status,
+                        paid=update_data.paid,
+                        update_scope=None,  # Single meeting update
+                    )
+
+                    # Apply time offsets if available
+                    if time_offset_start is not None and time_offset_end is not None:
+                        future_update_data.start_time = (
+                            future_meeting.start_time + time_offset_start
+                        )
+                        future_update_data.end_time = (
+                            future_meeting.end_time + time_offset_end
+                        )
+                    else:
+                        # No time changes, use original values
+                        future_update_data.start_time = update_data.start_time
+                        future_update_data.end_time = update_data.end_time
+
+                    await self._update_single_meeting(
+                        user_id, future_meeting.id, future_update_data
+                    )
 
             return updated_meeting
 
         elif update_data.update_scope == RecurrenceUpdateScope.ALL_MEETINGS.value:
             # Update all meetings in the recurrence (including past ones)
-            all_meetings = await self.storage.get_all(
-                user_id, {"recurrence_id": str(meeting.recurrence_id)}
+            # Get the original recurrence times to identify which meetings to update
+            from app.api.recurrences.service import RecurrenceService
+
+            recurrence_service = RecurrenceService()
+            recurrence = await recurrence_service.get_recurrence(
+                user_id, meeting.recurrence_id
             )
 
-            for all_meeting in all_meetings:
-                await self._update_single_meeting(user_id, all_meeting.id, update_data)
+            if recurrence:
+                # Convert recurrence times to datetime for comparison
+                meeting_date = meeting.start_time.date()
+                from datetime import time
+
+                recurrence_start_time = time.fromisoformat(recurrence.start_time)
+                recurrence_end_time = time.fromisoformat(recurrence.end_time)
+
+                # Create datetime objects for the original pattern times
+                original_pattern_start = datetime.combine(
+                    meeting_date, recurrence_start_time
+                )
+                original_pattern_end = datetime.combine(
+                    meeting_date, recurrence_end_time
+                )
+
+                all_meetings = await self.storage.get_all(
+                    user_id, {"recurrence_id": str(meeting.recurrence_id)}
+                )
+
+                # Filter for meetings that match the original pattern
+                all_meetings = [
+                    m
+                    for m in all_meetings
+                    if abs((m.start_time - original_pattern_start).total_seconds())
+                    < 60  # Within 1 minute
+                    and abs((m.end_time - original_pattern_end).total_seconds())
+                    < 60  # Within 1 minute
+                ]
+
+                for _i, all_meeting in enumerate(all_meetings):
+                    # Create update data with time offsets applied
+                    all_update_data = MeetingUpdateRequest(
+                        service_id=update_data.service_id,
+                        client_id=update_data.client_id,
+                        title=update_data.title,
+                        recurrence_id=update_data.recurrence_id,
+                        membership_id=update_data.membership_id,
+                        price_per_hour=update_data.price_per_hour,
+                        status=update_data.status,
+                        paid=update_data.paid,
+                        update_scope=None,  # Single meeting update
+                    )
+
+                    # Apply time offsets if available
+                    if time_offset_start is not None and time_offset_end is not None:
+                        all_update_data.start_time = (
+                            all_meeting.start_time + time_offset_start
+                        )
+                        all_update_data.end_time = (
+                            all_meeting.end_time + time_offset_end
+                        )
+                    else:
+                        # No time changes, use original values
+                        all_update_data.start_time = update_data.start_time
+                        all_update_data.end_time = update_data.end_time
+
+                    await self._update_single_meeting(
+                        user_id, all_meeting.id, all_update_data
+                    )
 
             return await self._update_single_meeting(user_id, meeting.id, update_data)
 

@@ -225,8 +225,13 @@ const MeetingViewModal: React.FC<MeetingViewModalProps> = ({ isOpen, onClose, on
   const performUpdate = async (updateData: any, updateScope?: string) => {
     setSubmitting(true);
     try {
-      const finalUpdateData = updateScope ? { ...updateData, update_scope: updateScope } : updateData;
-      await apiClient.updateMeeting(meeting!.id, finalUpdateData);
+      if (updateScope) {
+        // Use the recurrences endpoint for recurring meeting updates
+        await apiClient.updateRecurringMeeting(meeting!.id, updateData, updateScope as 'this_meeting_only' | 'this_and_future' | 'all_meetings');
+      } else {
+        // Use the regular meetings endpoint for single meeting updates
+        await apiClient.updateMeeting(meeting!.id, updateData);
+      }
       toast({ title: 'Meeting updated', status: 'success', duration: 2000, isClosable: true });
       onSuccess();
       onClose();
@@ -259,7 +264,13 @@ const MeetingViewModal: React.FC<MeetingViewModalProps> = ({ isOpen, onClose, on
   const performDelete = async (deleteScope?: string) => {
     setDeleting(true);
     try {
-      await apiClient.deleteMeeting(meeting!.id, deleteScope);
+      if (deleteScope) {
+        // Use the recurrences endpoint for recurring meeting deletions
+        await apiClient.deleteRecurringMeeting(meeting!.id, deleteScope as 'this_meeting_only' | 'this_and_future' | 'all_meetings');
+      } else {
+        // Use the regular meetings endpoint for single meeting deletions
+        await apiClient.deleteMeeting(meeting!.id);
+      }
       toast({ title: 'Meeting deleted', status: 'success', duration: 2000, isClosable: true });
       onSuccess();
       onClose();

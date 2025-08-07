@@ -23,6 +23,10 @@ import {
   HStack,
   Box,
   Badge,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  AlertDescription,
 } from '@chakra-ui/react';
 import { apiClient, Service, Client, Membership, MembershipProgress } from '../lib/api';
 
@@ -68,6 +72,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'>('WEEKLY');
   const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+  const [useMembershipForRecurrence, setUseMembershipForRecurrence] = useState(false);
 
   // For duration logic
   const [serviceDuration, setServiceDuration] = useState<number | null>(null);
@@ -246,6 +251,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
     setIsRecurring(false);
             setRecurrenceFrequency('WEEKLY');
     setRecurrenceEndDate('');
+    setUseMembershipForRecurrence(false);
   }, [isOpen, clientDuration, serviceDuration, clientPrice, servicePrice]);
 
   // Update end time and price when client/service/startTime changes
@@ -278,7 +284,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
         const startTimeOnly = startDate.getUTCHours().toString().padStart(2, '0') + ':' + startDate.getUTCMinutes().toString().padStart(2, '0'); // HH:mm in UTC
         const endTimeOnly = endDate.getUTCHours().toString().padStart(2, '0') + ':' + endDate.getUTCMinutes().toString().padStart(2, '0'); // HH:mm in UTC
 
-        await apiClient.createRecurrence({
+        const result = await apiClient.createRecurrence({
           service_id: serviceId,
           client_id: clientId,
           frequency: recurrenceFrequency,
@@ -288,11 +294,30 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
           start_time: startTimeOnly,
           end_time: endTimeOnly,
           price_per_hour: parseFloat(pricePerHour),
+          use_membership: useMembershipForRecurrence, // Only use membership if explicitly selected
         });
-        toast({ title: 'Recurring meeting created', status: 'success', duration: 2000, isClosable: true });
+
+        // Show success message with limitation info if applicable and membership was used
+        if (result.limitation_info && useMembershipForRecurrence) {
+          const limitation = result.limitation_info;
+          toast({
+            title: 'Recurring meeting created with limitations',
+            description: `${limitation.meetings_created} of ${limitation.total_possible_meetings} meetings created. ${limitation.message}`,
+            status: 'warning',
+            duration: 8000,
+            isClosable: true
+          });
+        } else {
+          toast({
+            title: 'Recurring meeting created',
+            status: 'success',
+            duration: 2000,
+            isClosable: true
+          });
+        }
       } else {
         // Create single meeting
-        const meetingData: any = {
+        await apiClient.createMeeting({
           service_id: serviceId,
           client_id: clientId,
           title,
@@ -301,20 +326,22 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
           price_per_hour: parseFloat(pricePerHour),
           status,
           paid,
-        };
-
-        // Add membership_id if using membership
-        if (useMembership && activeMembership) {
-          meetingData.membership_id = activeMembership.id;
-        }
-
-        await apiClient.createMeeting(meetingData);
+          membership_id: useMembership && activeMembership ? activeMembership.id : undefined,
+        });
         toast({ title: 'Meeting created', status: 'success', duration: 2000, isClosable: true });
       }
+
       onSuccess();
       onClose();
     } catch (err) {
-      toast({ title: 'Failed to create meeting', status: 'error', duration: 3000, isClosable: true });
+      console.error('Error creating meeting:', err);
+      toast({
+        title: 'Failed to create meeting',
+        description: 'Please try again.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -423,6 +450,49 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
 
                 {isRecurring && (
                   <VStack spacing={4} align="start">
+                    {/* Membership Option for Recurrence */}
+                    {activeMembership && (
+                      <Box p={4} bg="purple.50" borderRadius="md" border="1px solid" borderColor="purple.200">
+                        <Flex justify="space-between" align="center" mb={2}>
+                          <Text fontWeight="semibold" color="purple.700">
+                            Active Membership Available
+                          </Text>
+                          <Badge colorScheme="purple">{activeMembership.name}</Badge>
+                        </Flex>
+                        <Text fontSize="sm" color="purple.600" mb={3}>
+                          {membershipProgress ?
+                            `${membershipProgress.completed_meetings}/${membershipProgress.total_meetings} meetings` :
+                            `${activeMembership.total_meetings} meetings`
+                          } • ${activeMembership.price_per_meeting} per meeting
+                        </Text>
+                        <Checkbox
+                          isChecked={useMembershipForRecurrence}
+                          onChange={e => setUseMembershipForRecurrence(e.target.checked)}
+                          colorScheme="purple"
+                        >
+                          Use this membership for recurring meetings
+                        </Checkbox>
+                      </Box>
+                    )}
+
+                    {/* Membership Information Alert - Only show when membership is selected */}
+                    {activeMembership && membershipProgress && useMembershipForRecurrence && (
+                      <Alert status="info" borderRadius="md">
+                        <AlertIcon />
+                        <Box>
+                          <AlertTitle>Active Membership</AlertTitle>
+                          <AlertDescription>
+                            {activeMembership.name} - {membershipProgress.remaining_meetings} meetings remaining
+                            {membershipProgress.remaining_meetings < 5 && (
+                              <Text fontSize="sm" mt={1}>
+                                ⚠️ Limited meetings available. Only {membershipProgress.remaining_meetings} meetings will be created.
+                              </Text>
+                            )}
+                          </AlertDescription>
+                        </Box>
+                      </Alert>
+                    )}
+
                     <FormControl isRequired={isRecurring}>
                       <FormLabel>Frequency</FormLabel>
                       <Select value={recurrenceFrequency} onChange={e => setRecurrenceFrequency(e.target.value as any)}>
