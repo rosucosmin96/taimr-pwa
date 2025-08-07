@@ -154,6 +154,47 @@ class MembershipService:
             for meeting in meetings
         ]
 
+    async def get_membership_available_meetings(
+        self, user_id: UUID, membership_id: UUID
+    ) -> dict:
+        """
+        Get the actual number of meetings available for a membership.
+        This considers both completed meetings and scheduled meetings.
+        """
+        membership = await self.storage.get_by_id(user_id, membership_id)
+        if not membership:
+            raise ValueError("Membership not found")
+
+        # Get completed meetings count
+        done_meetings_count = await self._get_done_meetings_count(str(membership_id))
+
+        # Get all meetings for this membership (including scheduled ones)
+        all_membership_meetings = await self.meeting_storage.get_all(
+            user_id, {"membership_id": str(membership_id)}
+        )
+
+        # Count scheduled meetings (not completed)
+        scheduled_meetings_count = len(
+            [
+                meeting
+                for meeting in all_membership_meetings
+                if meeting["status"] != "done"
+            ]
+        )
+
+        # Calculate available meetings
+        total_used = done_meetings_count + scheduled_meetings_count
+        available_meetings = max(0, membership.total_meetings - total_used)
+
+        return {
+            "membership_id": str(membership_id),
+            "total_meetings": membership.total_meetings,
+            "completed_meetings": done_meetings_count,
+            "scheduled_meetings": scheduled_meetings_count,
+            "total_used": total_used,
+            "available_meetings": available_meetings,
+        }
+
     async def get_membership_progress(self, user_id: UUID, membership_id: UUID) -> dict:
         """Get membership progress (completed meetings vs total meetings)."""
         membership = await self.storage.get_by_id(user_id, membership_id)

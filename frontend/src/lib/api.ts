@@ -90,6 +90,7 @@ export interface RecurrenceCreateRequest {
   start_time: string; // HH:mm format
   end_time: string; // HH:mm format
   price_per_hour: number;
+  use_membership?: boolean; // Optional: whether to use active membership
 }
 
 export interface RecurrenceResponse {
@@ -105,6 +106,25 @@ export interface RecurrenceResponse {
   end_time: string;
   price_per_hour: number;
   created_at: string;
+}
+
+export interface RecurrenceLimitationInfo {
+  total_possible_meetings: number;
+  meetings_created: number;
+  membership_name: string;
+  available_meetings: number;
+  total_meetings: number;
+  completed_meetings: number;
+  scheduled_meetings: number;
+  message: string;
+}
+
+export interface RecurrenceCreateResponse {
+  recurrence: RecurrenceResponse;
+  meetings_created: number;
+  membership_used: boolean;
+  limitation_info?: RecurrenceLimitationInfo;
+  message?: string;
 }
 
 export interface MeetingUpdateRequest {
@@ -361,6 +381,17 @@ class ApiClient {
     });
   }
 
+  async updateRecurringMeeting(
+    id: string,
+    data: MeetingUpdateRequest,
+    updateScope: 'this_meeting_only' | 'this_and_future' | 'all_meetings'
+  ): Promise<Meeting[]> {
+    return this.request<Meeting[]>(`/recurrences/meetings/${id}?update_scope=${updateScope}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   async deleteMeeting(id: string, deleteScope?: string): Promise<void> {
     const params = deleteScope ? `?delete_scope=${deleteScope}` : '';
     await this.request(`/meetings/${id}${params}`, {
@@ -368,9 +399,18 @@ class ApiClient {
     });
   }
 
+  async deleteRecurringMeeting(
+    id: string,
+    deleteScope: 'this_meeting_only' | 'this_and_future' | 'all_meetings'
+  ): Promise<void> {
+    await this.request(`/recurrences/meetings/${id}?delete_scope=${deleteScope}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Recurrences API
-  async createRecurrence(recurrence: RecurrenceCreateRequest): Promise<RecurrenceResponse> {
-    return this.request<RecurrenceResponse>('/recurrences/', {
+  async createRecurrence(recurrence: RecurrenceCreateRequest): Promise<RecurrenceCreateResponse> {
+    return this.request<RecurrenceCreateResponse>('/recurrences/', {
       method: 'POST',
       body: JSON.stringify(recurrence),
     });

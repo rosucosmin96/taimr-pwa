@@ -19,6 +19,15 @@ class RecurrenceFrequency(str, Enum):
         raise ValueError(f"Invalid RecurrenceFrequency: {frequency_str}")
 
 
+class MembershipLimitation(BaseModel):
+    """Information about membership limitations when creating a recurrence"""
+
+    total_possible_meetings: int
+    meetings_created: int
+    membership_name: str
+    remaining_membership_meetings: int
+
+
 class RecurrenceBase(BaseModel):
     service_id: UUID
     client_id: UUID
@@ -50,7 +59,7 @@ class RecurrenceBase(BaseModel):
 
 
 class RecurrenceCreateRequest(RecurrenceBase):
-    pass
+    use_membership: bool = False  # Whether to use active membership if available
 
 
 class RecurrenceUpdateRequest(BaseModel):
@@ -69,6 +78,7 @@ class RecurrenceResponse(RecurrenceBase):
     id: UUID
     user_id: UUID
     created_at: datetime
+    membership_limitation: MembershipLimitation | None = None
 
     class Config:
         from_attributes = True
