@@ -19,6 +19,7 @@ import {
   ListItem,
 } from '@chakra-ui/react';
 import { apiClient, ClientStatsResponse } from '../lib/api';
+import { useCurrency } from '../lib/currency';
 
 interface ClientStatisticsModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ const ClientStatisticsModal: React.FC<ClientStatisticsModalProps> = ({
   endDate,
   serviceId,
 }) => {
+  const { format } = useCurrency();
   const [data, setData] = useState<ClientStatsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,8 +120,8 @@ const ClientStatisticsModal: React.FC<ClientStatisticsModalProps> = ({
               {/* Price Info */}
               <Box>
                 <Text fontWeight="bold">Price Info:</Text>
-                <Text>Total price: ${totalPrice.toFixed(2)}</Text>
-                <Text>Paid: ${paid.toFixed(2)}</Text>
+                <Text>Total price: {format(totalPrice)}</Text>
+                <Text>Paid: {format(paid)}</Text>
               </Box>
             </VStack>
           ) : (

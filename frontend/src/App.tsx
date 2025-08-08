@@ -17,6 +17,7 @@ import LandingPage from './pages/LandingPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import AuthCallback from './components/AuthCallback';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ProfileProvider } from './contexts/ProfileContext';
 import { ChakraProvider, Box, Flex, IconButton, Text, useBreakpointValue, Drawer, DrawerOverlay, DrawerContent, DrawerCloseButton, DrawerBody, VStack, Button } from '@chakra-ui/react';
 import { apiClient, Profile as UserProfile } from './lib/api';
 
@@ -339,9 +340,11 @@ const AppRoutes: React.FC = () => (
 const App: React.FC = () => (
   <ChakraProvider>
     <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
+      <ProfileProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </ProfileProvider>
     </AuthProvider>
   </ChakraProvider>
 );

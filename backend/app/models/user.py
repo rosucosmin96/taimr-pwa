@@ -17,6 +17,7 @@ class User(Base, TimestampMixin):
     name = Column(String(255), nullable=False)
     profile_picture_url = Column(Text, nullable=True)
     tutorial_checked = Column(Boolean, nullable=False, default=False)
+    currency = Column(String(3), nullable=False, default="USD")
 
     # Relationships
     services = relationship(

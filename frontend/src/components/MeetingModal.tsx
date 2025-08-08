@@ -29,6 +29,7 @@ import {
   AlertDescription,
 } from '@chakra-ui/react';
 import { apiClient, Service, Client, Membership, MembershipProgress } from '../lib/api';
+import { useCurrency } from '../lib/currency';
 
 interface MeetingModalProps {
   isOpen: boolean;
@@ -49,6 +50,7 @@ function localDateTimeToUTCISOString(localDateTime: string): string {
 
 const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const toast = useToast();
+  const { format } = useCurrency();
   const [services, setServices] = useState<Service[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [activeMembership, setActiveMembership] = useState<Membership | null>(null);
@@ -95,13 +97,13 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
   // Calculate price per meeting from price per hour
   const calculatePricePerMeeting = useCallback((hourlyRate: number) => {
     const durationHours = getMeetingDurationHours();
-    return (hourlyRate * durationHours).toFixed(2);
+    return hourlyRate * durationHours;
   }, [getMeetingDurationHours]);
 
   // Calculate price per hour from price per meeting
   const calculatePricePerHour = useCallback((meetingPrice: number) => {
     const durationHours = getMeetingDurationHours();
-    return durationHours > 0 ? (meetingPrice / durationHours).toFixed(2) : '0';
+    return durationHours > 0 ? meetingPrice / durationHours : 0;
   }, [getMeetingDurationHours]);
 
   // Handle price per hour change
@@ -110,7 +112,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
     if (!isEditingPricePerMeeting) {
       const hourlyRate = parseFloat(value) || 0;
       const meetingPrice = calculatePricePerMeeting(hourlyRate);
-      setPricePerMeeting(meetingPrice);
+      setPricePerMeeting(meetingPrice.toString());
     }
   };
 
@@ -120,7 +122,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
     if (!isEditingPricePerHour) {
       const meetingPrice = parseFloat(value) || 0;
       const hourlyRate = calculatePricePerHour(meetingPrice);
-      setPricePerHour(hourlyRate);
+      setPricePerHour(hourlyRate.toString());
     }
   };
 
@@ -129,7 +131,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
     if (pricePerHour && startTime && endTime && !isEditingPricePerHour && !isEditingPricePerMeeting) {
       const hourlyRate = parseFloat(pricePerHour);
       const meetingPrice = calculatePricePerMeeting(hourlyRate);
-      setPricePerMeeting(meetingPrice);
+      setPricePerMeeting(meetingPrice.toString());
     }
   }, [startTime, endTime, pricePerHour, calculatePricePerMeeting, isEditingPricePerHour, isEditingPricePerMeeting]);
 
@@ -138,7 +140,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
     if (useMembership && activeMembership) {
       setPricePerMeeting(activeMembership.price_per_meeting.toString());
       const hourlyRate = calculatePricePerHour(activeMembership.price_per_meeting);
-      setPricePerHour(hourlyRate);
+      setPricePerHour(hourlyRate.toString());
     }
   }, [useMembership, activeMembership, calculatePricePerHour]);
 
@@ -389,7 +391,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
                       {membershipProgress ?
                         `${membershipProgress.completed_meetings}/${membershipProgress.total_meetings} meetings` :
                         `${activeMembership.total_meetings} meetings`
-                      } • ${activeMembership.price_per_meeting} per meeting
+                      } • {format(activeMembership.price_per_meeting)} per meeting
                     </Text>
                     <Checkbox
                       isChecked={useMembership}
@@ -463,7 +465,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
                           {membershipProgress ?
                             `${membershipProgress.completed_meetings}/${membershipProgress.total_meetings} meetings` :
                             `${activeMembership.total_meetings} meetings`
-                          } • ${activeMembership.price_per_meeting} per meeting
+                          } • {format(activeMembership.price_per_meeting)} per meeting
                         </Text>
                         <Checkbox
                           isChecked={useMembershipForRecurrence}

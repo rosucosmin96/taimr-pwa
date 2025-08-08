@@ -3,6 +3,7 @@ import { Box, Text, Flex, VStack, Button, Icon } from '@chakra-ui/react';
 import { Meeting } from '../lib/api';
 import MeetingModal from './MeetingModal';
 import MeetingViewModal from './MeetingViewModal';
+import { useCurrency } from '../lib/currency';
 import { useContainerWidth } from '../lib/useContainerWidth';
 
 interface DailyCalendarProps {
@@ -25,6 +26,7 @@ const GUTTER_WIDTH = 64; // px, fixed gutter for time labels
 const MIN_MEETING_WIDTH = 120; // px
 
 const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
+  const { format } = useCurrency();
   const [showFullDay, setShowFullDay] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -322,7 +324,7 @@ const DailyCalendar: React.FC<DailyCalendarProps> = ({ meetings }) => {
                   })}
                 </Text>
                 <Text fontSize="xs" color="white" opacity={0.8} noOfLines={1}>
-                  ${meeting.price_total.toFixed(2)}
+                  {format(meeting.price_total)}
                 </Text>
               </VStack>
             </Box>

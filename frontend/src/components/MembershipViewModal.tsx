@@ -18,6 +18,7 @@ import {
   Divider,
 } from '@chakra-ui/react';
 import { apiClient, Membership, Meeting, Service, Client } from '../lib/api';
+import { useCurrency } from '../lib/currency';
 import MembershipEditModal from './MembershipEditModal';
 import MembershipDeleteModal from './MembershipDeleteModal';
 
@@ -27,6 +28,7 @@ interface MembershipViewModalProps {
 }
 
 const MembershipViewModal: React.FC<MembershipViewModalProps> = ({ membership, onClose }) => {
+  const { format } = useCurrency();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,8 +86,8 @@ const MembershipViewModal: React.FC<MembershipViewModalProps> = ({ membership, o
               <Divider />
               <Flex gap={8} wrap="wrap">
                 <Text fontSize="sm">Total Meetings<br /><b>{meetings.filter((m) => m.status === 'done').length} / {currentMembership.total_meetings}</b></Text>
-                <Text fontSize="sm">Price per Meeting<br /><b>${currentMembership.price_per_meeting}</b></Text>
-                <Text fontSize="sm">Total Price<br /><b>${currentMembership.price_per_membership}</b></Text>
+                <Text fontSize="sm">Price per Meeting<br /><b>{format(currentMembership.price_per_meeting)}</b></Text>
+                <Text fontSize="sm">Total Price<br /><b>{format(currentMembership.price_per_membership)}</b></Text>
                 <Text fontSize="sm">Availability<br /><b>{currentMembership.availability_days} days</b></Text>
                 <Text fontSize="sm">Start Date<br /><b>{currentMembership.start_date ? new Date(currentMembership.start_date).toLocaleDateString() : '-'}</b></Text>
               </Flex>

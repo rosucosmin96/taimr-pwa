@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import StatsCard from '../components/StatsCard';
 import DailyCalendar from '../components/DailyCalendar';
 import TutorialModal from '../components/TutorialModal';
+import { CurrencyLoadingWrapper } from '../components/CurrencyLoadingWrapper';
 import { CalendarDaysIcon, UserGroupIcon, CurrencyDollarIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { Box, Grid, Heading, Text, Flex, Stack, Spinner, Alert, AlertIcon } from '@chakra-ui/react';
-import { apiClient, StatsOverview, Meeting, Profile } from '../lib/api';
+import { apiClient, StatsOverview, Meeting } from '../lib/api';
+import { useProfile } from '../contexts/ProfileContext';
+import { useCurrency } from '../lib/currency';
 
 interface KPI {
   title: string;
@@ -18,10 +21,11 @@ const Dashboard: React.FC = () => {
   const [todayStats, setTodayStats] = useState<StatsOverview | null>(null);
   const [weekStats, setWeekStats] = useState<StatsOverview | null>(null);
   const [todayMeetings, setTodayMeetings] = useState<Meeting[]>([]);
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
+  const { profile, updateProfile } = useProfile();
+  const { format } = useCurrency();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -43,19 +47,17 @@ const Dashboard: React.FC = () => {
         const weekStartUTC = weekStartUTCDate.toISOString();
         const weekEndUTC = weekEndUTCDate.toISOString();
 
-        const [todayStatsData, weekStatsData, meetingsData, profileData] = await Promise.all([
+        const [todayStatsData, weekStatsData, meetingsData] = await Promise.all([
           apiClient.getStatsOverview(todayStartUTC, todayEndUTC), // Today's stats
           apiClient.getStatsOverview(weekStartUTC, weekEndUTC), // This week's stats
           apiClient.getMeetings(undefined, now.toISOString().split('T')[0]),
-          apiClient.getProfile()
         ]);
         setTodayStats(todayStatsData);
         setWeekStats(weekStatsData);
         setTodayMeetings(meetingsData);
-        setProfile(profileData);
 
         // Show tutorial if user hasn't completed it
-        if (profileData && !profileData.tutorial_checked) {
+        if (profile && !profile.tutorial_checked) {
           setShowTutorial(true);
         }
       } catch (err) {
@@ -94,8 +96,7 @@ const Dashboard: React.FC = () => {
   const handleTutorialComplete = async () => {
     try {
       if (profile) {
-        await apiClient.updateProfile({ tutorial_checked: true });
-        setProfile({ ...profile, tutorial_checked: true });
+        await updateProfile({ tutorial_checked: true });
       }
     } catch (err) {
       console.error('Failed to update tutorial status:', err);
@@ -107,8 +108,8 @@ const Dashboard: React.FC = () => {
   const kpis: KPI[] = [
     {
       title: 'Today\'s Revenue',
-      value: `$${todayStats?.total_revenue.toFixed(2) || '0.00'}`,
-      weeklyValue: `$${weekStats?.total_revenue.toFixed(2) || '0.00'} this week`,
+      value: format(todayStats?.total_revenue || 0),
+      weeklyValue: `${format(weekStats?.total_revenue || 0)} this week`,
       icon: <CurrencyDollarIcon style={{ width: 28, height: 28 }} color="#38A169" />,
       color: 'green.100'
     },
@@ -136,44 +137,46 @@ const Dashboard: React.FC = () => {
   ];
 
   return (
-    <Stack spacing={8} px={{ base: 2, md: 8 }} py={4}>
-      <Heading as="h1" size="lg" mb={2}>Dashboard</Heading>
-      {profile?.name && (
-        <Text fontSize="xl" color="gray.700" mb={2}>
-          Congrats for this day, {profile.name}! Make the most of it!
-        </Text>
-      )}
-      {/* KPI Cards */}
-      <Grid templateColumns={{ base: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }} gap={4}>
-        {kpis.map((kpi) => (
-          <Box key={kpi.title} bg="white" rounded="xl" shadow="md" p={6}>
-            <Flex align="center" justify="space-between" mb={3}>
-              <Box p={2} rounded="lg" bg={kpi.color}>
-                {kpi.icon}
-              </Box>
-            </Flex>
-            <Text fontSize="2xl" fontWeight="bold" mb={1}>
-              {kpi.value}
-            </Text>
-            <Text fontSize="sm" color="gray.600" mb={2}>
-              {kpi.title}
-            </Text>
-            <Text fontSize="xs" color="gray.500">
-              {kpi.weeklyValue}
-            </Text>
-          </Box>
-        ))}
-      </Grid>
-      {/* Daily Calendar */}
-      <DailyCalendar meetings={todayMeetings} />
+    <CurrencyLoadingWrapper>
+      <Stack spacing={8} px={{ base: 2, md: 8 }} py={4}>
+        <Heading as="h1" size="lg" mb={2}>Dashboard</Heading>
+        {profile?.name && (
+          <Text fontSize="xl" color="gray.700" mb={2}>
+            Congrats for this day, {profile.name}! Make the most of it!
+          </Text>
+        )}
+        {/* KPI Cards */}
+        <Grid templateColumns={{ base: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }} gap={4}>
+          {kpis.map((kpi) => (
+            <Box key={kpi.title} bg="white" rounded="xl" shadow="md" p={6}>
+              <Flex align="center" justify="space-between" mb={3}>
+                <Box p={2} rounded="lg" bg={kpi.color}>
+                  {kpi.icon}
+                </Box>
+              </Flex>
+              <Text fontSize="2xl" fontWeight="bold" mb={1}>
+                {kpi.value}
+              </Text>
+              <Text fontSize="sm" color="gray.600" mb={2}>
+                {kpi.title}
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                {kpi.weeklyValue}
+              </Text>
+            </Box>
+          ))}
+        </Grid>
+        {/* Daily Calendar */}
+        <DailyCalendar meetings={todayMeetings} />
 
-      {/* Tutorial Modal */}
-      <TutorialModal
-        isOpen={showTutorial}
-        onClose={() => setShowTutorial(false)}
-        onComplete={handleTutorialComplete}
-      />
-    </Stack>
+        {/* Tutorial Modal */}
+        <TutorialModal
+          isOpen={showTutorial}
+          onClose={() => setShowTutorial(false)}
+          onComplete={handleTutorialComplete}
+        />
+      </Stack>
+    </CurrencyLoadingWrapper>
   );
 };
 

@@ -11,6 +11,7 @@ import {
   FormControl,
   FormLabel,
   Input,
+  Select,
   VStack,
   Avatar,
   Box,
@@ -18,6 +19,7 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { apiClient, Profile as UserProfile } from '../lib/api';
+import { SUPPORTED_CURRENCIES, CURRENCY_LABELS } from '../lib/currency';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -34,6 +36,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 }) => {
   const [name, setName] = useState(profile?.name || '');
   const [profilePictureUrl, setProfilePictureUrl] = useState(profile?.profile_picture_url || '');
+  const [currency, setCurrency] = useState(profile?.currency || 'USD');
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
 
@@ -41,6 +44,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   React.useEffect(() => {
     setName(profile?.name || '');
     setProfilePictureUrl(profile?.profile_picture_url || '');
+    setCurrency(profile?.currency || 'USD');
   }, [profile]);
 
   const handleSubmit = async () => {
@@ -59,7 +63,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     try {
       const updatedProfile = await apiClient.updateProfile({
         name: name.trim(),
-        profile_picture_url: profilePictureUrl.trim() || null,
+        profile_picture_url: profilePictureUrl.trim() || undefined,
+        currency: currency,
       });
 
       onProfileUpdated(updatedProfile);
@@ -89,6 +94,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     // Reset form to original values
     setName(profile?.name || '');
     setProfilePictureUrl(profile?.profile_picture_url || '');
+    setCurrency(profile?.currency || 'USD');
     onClose();
   };
 
@@ -139,6 +145,25 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
               />
               <Text fontSize="xs" color="gray.500" mt={1}>
                 Leave empty to use default avatar
+              </Text>
+            </FormControl>
+
+            {/* Currency Field */}
+            <FormControl isRequired>
+              <FormLabel>Currency</FormLabel>
+              <Select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                size="lg"
+              >
+                {Object.keys(SUPPORTED_CURRENCIES).map((curr) => (
+                  <option key={curr} value={curr}>
+                    {CURRENCY_LABELS[curr]} ({curr})
+                  </option>
+                ))}
+              </Select>
+              <Text fontSize="xs" color="gray.500" mt={1}>
+                This will be used for all price displays throughout the app
               </Text>
             </FormControl>
           </VStack>

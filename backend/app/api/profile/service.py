@@ -1,6 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
+from app.api.commons.shared import Currency
 from app.api.profile.model import ProfileResponse, ProfileUpdateRequest
 from app.models import User as UserModel
 from app.storage.factory import StorageFactory
@@ -31,6 +32,7 @@ class ProfileService:
                     "name": name,
                     "profile_picture_url": None,
                     "tutorial_checked": False,
+                    "currency": Currency.USD,
                 }
                 user = await self.storage.create(user_id, user_data)
             except Exception:
@@ -41,6 +43,7 @@ class ProfileService:
                     name=user_email.split("@")[0] if user_email else "User",
                     profile_picture_url=None,
                     tutorial_checked=False,
+                    currency=Currency.USD,
                     created_at=datetime.utcnow(),
                 )
 
@@ -64,6 +67,9 @@ class ProfileService:
                     if profile.tutorial_checked is not None
                     else False
                 ),
+                "currency": (
+                    profile.currency.value if profile.currency else Currency.USD
+                ),
             }
             user = await self.storage.create(user_id, user_data)
         else:
@@ -76,6 +82,8 @@ class ProfileService:
                 update_fields["profile_picture_url"] = profile.profile_picture_url
             if profile.tutorial_checked is not None:
                 update_fields["tutorial_checked"] = profile.tutorial_checked
+            if profile.currency is not None:
+                update_fields["currency"] = profile.currency.value
             if user_email:
                 update_fields["email"] = user_email
 
@@ -96,6 +104,7 @@ class ProfileService:
             "name": name or "User",
             "profile_picture_url": None,
             "tutorial_checked": False,
+            "currency": Currency.USD,
         }
         return await self.storage.create(user_id, user_data)
 

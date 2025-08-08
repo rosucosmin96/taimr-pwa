@@ -27,6 +27,7 @@ import {
   NumberDecrementStepper,
 } from '@chakra-ui/react';
 import { apiClient, Service, Client } from '../lib/api';
+import { useCurrency } from '../lib/currency';
 
 interface MembershipModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ interface MembershipModalProps {
 
 const MembershipModal: React.FC<MembershipModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const toast = useToast();
+  const { format } = useCurrency();
   const [services, setServices] = useState<Service[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -211,7 +213,7 @@ const MembershipModal: React.FC<MembershipModalProps> = ({ isOpen, onClose, onSu
                   </FormControl>
 
                   <FormControl isRequired>
-                    <FormLabel>Price per Membership ($)</FormLabel>
+                    <FormLabel>Price per Membership</FormLabel>
                     <Input
                       type="number"
                       value={pricePerMembership}
@@ -245,7 +247,7 @@ const MembershipModal: React.FC<MembershipModalProps> = ({ isOpen, onClose, onSu
                       Price per Meeting
                     </Text>
                     <Text fontSize="lg" fontWeight="semibold">
-                      ${pricePerMeeting().toFixed(2)}
+                      {format(pricePerMeeting())}
                     </Text>
                   </Box>
                 )}
