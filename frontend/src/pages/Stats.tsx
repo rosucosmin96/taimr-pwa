@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import StatsCard from '../components/StatsCard';
+import { CurrencyLoadingWrapper } from '../components/CurrencyLoadingWrapper';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { CurrencyDollarIcon, UserGroupIcon, CalendarDaysIcon, ClockIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import {
@@ -38,6 +39,7 @@ import {
 } from '@chakra-ui/react';
 import { apiClient, StatsOverview, Service, DailyBreakdownItem } from '../lib/api';
 import ClientStatisticsModal from '../components/ClientStatisticsModal';
+import { useCurrency } from '../lib/currency';
 
 interface ServiceStats {
   serviceId: string;
@@ -98,6 +100,7 @@ const Stats: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [dailyBreakdown, setDailyBreakdown] = useState<DailyBreakdownItem[]>([]);
+  const { format } = useCurrency();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -359,7 +362,7 @@ const Stats: React.FC = () => {
   const kpis = [
     {
       title: 'Total Revenue',
-      value: `$${stats?.total_revenue.toFixed(2) || '0.00'}`,
+      value: format(stats?.total_revenue || 0),
       icon: <CurrencyDollarIcon style={{ width: 28, height: 28 }} color="#38A169" />,
       color: 'green.100'
     },
@@ -383,7 +386,7 @@ const Stats: React.FC = () => {
     },
     {
       title: 'Revenue Paid',
-      value: `$${stats?.revenue_paid?.toFixed(2) || '0.00'}`,
+      value: format(stats?.revenue_paid || 0),
       icon: <CurrencyDollarIcon style={{ width: 28, height: 28 }} color="#38A169" />,
       color: 'green.100'
     },
@@ -396,14 +399,14 @@ const Stats: React.FC = () => {
     // New KPI: Price per Meeting
     {
       title: 'Price per Meeting',
-      value: `$${stats && stats.done_meetings > 0 ? (stats.total_revenue / stats.done_meetings).toFixed(2) : '0.00'}`,
+      value: format(stats && stats.done_meetings > 0 ? (stats.total_revenue / stats.done_meetings) : 0),
       icon: <CurrencyDollarIcon style={{ width: 28, height: 28 }} color="#38A169" />,
       color: 'green.100'
     },
     // New KPI: Price per Hour
     {
       title: 'Price per Hour',
-      value: `$${stats && stats.total_hours > 0 ? (stats.total_revenue / stats.total_hours).toFixed(2) : '0.00'}`,
+      value: format(stats && stats.total_hours > 0 ? (stats.total_revenue / stats.total_hours) : 0),
       icon: <ClockIcon style={{ width: 28, height: 28 }} color="#3182CE" />,
       color: 'blue.100'
     }
@@ -444,9 +447,10 @@ const Stats: React.FC = () => {
   }));
 
   return (
-    <ResponsiveContentWrapper>
-      {(maxWidth) => (
-        <Stack spacing={{ base: 4, md: 8 }} px={{ base: 1, sm: 2, md: 8 }} py={{ base: 2, md: 4 }} w="full" maxW={maxWidth} minW={0} overflowX="hidden">
+    <CurrencyLoadingWrapper>
+      <ResponsiveContentWrapper>
+        {(maxWidth) => (
+          <Stack spacing={{ base: 4, md: 8 }} px={{ base: 1, sm: 2, md: 8 }} py={{ base: 2, md: 4 }} w="full" maxW={maxWidth} minW={0} overflowX="hidden">
           <Heading as="h1" size={{ base: "md", md: "lg" }} mb={4} textAlign={{ base: "center", md: "left" }} className="responsive-heading">Statistics</Heading>
 
           {/* Period and Service Selectors */}
@@ -614,7 +618,7 @@ const Stats: React.FC = () => {
                       <BarChart data={serviceRevenueData}>
                         <XAxis dataKey="name" fontSize={isMobile ? 8 : 12} />
                         <YAxis fontSize={isMobile ? 8 : 12} />
-                        <Tooltip formatter={(value) => [`$${value}`, 'Revenue']} />
+                        <Tooltip formatter={(value) => [format(Number(value)), 'Revenue']} />
                         <Bar dataKey="revenue" fill="#38A169" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -648,7 +652,7 @@ const Stats: React.FC = () => {
                           <SimpleGrid columns={2} spacing={{ base: 2, md: 3 }}>
                             <Box>
                               <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Revenue</Text>
-                              <Text fontWeight="bold" color="green.600" fontSize={{ base: "sm", md: "md" }}>${service.revenue.toFixed(2)}</Text>
+                              <Text fontWeight="bold" color="green.600" fontSize={{ base: "sm", md: "md" }}>{format(service.revenue)}</Text>
                             </Box>
                             <Box>
                               <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Hours</Text>
@@ -661,7 +665,7 @@ const Stats: React.FC = () => {
                             <Box>
                               <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Avg. Revenue/Hour</Text>
                               <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>
-                                ${service.hours > 0 ? (service.revenue / service.hours).toFixed(2) : '0.00'}
+                                {format(service.hours > 0 ? (service.revenue / service.hours) : 0)}
                               </Text>
                             </Box>
                           </SimpleGrid>
@@ -688,11 +692,11 @@ const Stats: React.FC = () => {
                         {serviceStats.map((service) => (
                           <Tr key={service.serviceId}>
                             <Td fontWeight="medium" fontSize={{ base: "xs", md: "sm" }}>{service.serviceName}</Td>
-                            <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${service.revenue.toFixed(2)}</Td>
+                            <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{format(service.revenue)}</Td>
                             <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{service.hours.toFixed(1)}h</Td>
                             <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{service.meetings}</Td>
                             <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>
-                              ${service.hours > 0 ? (service.revenue / service.hours).toFixed(2) : '0.00'}
+                              {format(service.hours > 0 ? (service.revenue / service.hours) : 0)}
                             </Td>
                           </Tr>
                         ))}
@@ -792,7 +796,7 @@ const Stats: React.FC = () => {
                   ]}>
                     <XAxis dataKey="name" fontSize={isMobile ? 8 : 12} />
                     <YAxis fontSize={isMobile ? 8 : 12} />
-                    <Tooltip formatter={(value) => [`$${value}`, 'Revenue']} />
+                    <Tooltip formatter={(value) => [format(Number(value)), 'Revenue']} />
                     <Bar dataKey="revenue" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -802,13 +806,13 @@ const Stats: React.FC = () => {
                   <Box textAlign="center">
                     <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Previous Period</Text>
                     <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="gray.700">
-                      ${previousStats?.total_revenue.toFixed(2) || '0.00'}
+                      {format(previousStats?.total_revenue || 0)}
                     </Text>
                   </Box>
                   <Box textAlign="center">
                     <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Current Period</Text>
                     <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="green.600">
-                      ${stats?.total_revenue.toFixed(2) || '0.00'}
+                      {format(stats?.total_revenue || 0)}
                     </Text>
                   </Box>
                   <Box textAlign="center">
@@ -852,7 +856,7 @@ const Stats: React.FC = () => {
                   ]}>
                     <XAxis dataKey="name" fontSize={isMobile ? 8 : 12} />
                     <YAxis fontSize={isMobile ? 8 : 12} />
-                    <Tooltip formatter={(value) => [`$${value}`, 'Revenue']} />
+                    <Tooltip formatter={(value) => [format(Number(value)), 'Revenue']} />
                     <Bar dataKey="revenue" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -862,19 +866,19 @@ const Stats: React.FC = () => {
                   <Box textAlign="center">
                     <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Revenue</Text>
                     <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="green.600">
-                      ${stats?.membership_revenue.toFixed(2) || '0.00'}
+                      {format(stats?.membership_revenue || 0)}
                     </Text>
                   </Box>
                   <Box textAlign="center">
                     <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Revenue Paid</Text>
                     <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="blue.600">
-                      ${stats?.membership_revenue_paid.toFixed(2) || '0.00'}
+                      {format(stats?.membership_revenue_paid || 0)}
                     </Text>
                   </Box>
                   <Box textAlign="center">
                     <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Outstanding</Text>
                     <Text fontSize={{ base: "sm", md: "lg" }} fontWeight="bold" color="red.600">
-                      ${((stats?.membership_revenue || 0) - (stats?.membership_revenue_paid || 0)).toFixed(2)}
+                      {format((stats?.membership_revenue || 0) - (stats?.membership_revenue_paid || 0))}
                     </Text>
                   </Box>
                 </SimpleGrid>
@@ -927,11 +931,11 @@ const Stats: React.FC = () => {
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Revenue</Text>
-                                <Text fontWeight="bold" color="green.600" fontSize={{ base: "sm", md: "md" }}>${safeToFixed(client.totalRevenue)}</Text>
+                                <Text fontWeight="bold" color="green.600" fontSize={{ base: "sm", md: "md" }}>{format(client.totalRevenue)}</Text>
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Price/Hour</Text>
-                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${safeToFixed(client.pricePerHour)}</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{format(client.pricePerHour)}</Text>
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Total Hours</Text>
@@ -939,7 +943,7 @@ const Stats: React.FC = () => {
                               </Box>
                               <Box>
                                 <Text fontSize={{ base: "xs", md: "sm" }} color="gray.600">Price/Meeting</Text>
-                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>${safeToFixed(client.pricePerMeeting)}</Text>
+                                <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>{format(client.pricePerMeeting)}</Text>
                               </Box>
                             </SimpleGrid>
                           </VStack>
@@ -975,10 +979,10 @@ const Stats: React.FC = () => {
                               <Td fontWeight="medium" fontSize={{ base: "xs", md: "sm" }}>{client.clientName}</Td>
                               <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.totalMeetings}</Td>
                               <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{client.doneMeetings}</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${safeToFixed(client.totalRevenue)}</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${safeToFixed(client.pricePerHour)}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{format(client.totalRevenue)}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{format(client.pricePerHour)}</Td>
                               <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{safeToFixed(client.hours, 1)}h</Td>
-                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>${safeToFixed(client.pricePerMeeting)}</Td>
+                              <Td isNumeric fontSize={{ base: "xs", md: "sm" }}>{format(client.pricePerMeeting)}</Td>
                             </Tr>
                           ))}
                         </Tbody>
@@ -1009,6 +1013,7 @@ const Stats: React.FC = () => {
         </Stack>
       )}
     </ResponsiveContentWrapper>
+    </CurrencyLoadingWrapper>
   );
 };
 

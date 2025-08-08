@@ -48,6 +48,7 @@ export interface Profile {
   name: string;
   profile_picture_url?: string;
   tutorial_checked: boolean;
+  currency: string;
   created_at: string;
 }
 
@@ -445,6 +446,7 @@ class ApiClient {
     name?: string;
     profile_picture_url?: string;
     tutorial_checked?: boolean;
+    currency?: string;
   }): Promise<Profile> {
     return this.request<Profile>('/profile/', {
       method: 'PUT',

@@ -22,6 +22,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { apiClient, Membership } from '../lib/api';
+import { useCurrency } from '../lib/currency';
 
 interface MembershipEditModalProps {
   membership: Membership;
@@ -31,6 +32,7 @@ interface MembershipEditModalProps {
 }
 
 const MembershipEditModal: React.FC<MembershipEditModalProps> = ({ membership, isOpen, onClose, onSuccess }) => {
+  const { format } = useCurrency();
   const [name, setName] = useState(membership.name);
   const [paid, setPaid] = useState(membership.paid);
   const [status, setStatus] = useState(membership.status);
@@ -42,9 +44,9 @@ const MembershipEditModal: React.FC<MembershipEditModalProps> = ({ membership, i
 
   const pricePerMeeting = useMemo(() => {
     if (totalMeetings > 0) {
-      return (totalPrice / totalMeetings).toFixed(2);
+      return totalPrice / totalMeetings;
     }
-    return '0.00';
+    return 0;
   }, [totalPrice, totalMeetings]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,14 +116,14 @@ const MembershipEditModal: React.FC<MembershipEditModalProps> = ({ membership, i
                 </NumberInput>
               </FormControl>
               <FormControl isRequired>
-                <FormLabel>Total Price ($)</FormLabel>
+                <FormLabel>Total Price</FormLabel>
                 <NumberInput min={0} precision={2} value={totalPrice} onChange={(_, n) => setTotalPrice(Number(n))}>
                   <NumberInputField />
                 </NumberInput>
               </FormControl>
               <FormControl>
                 <FormLabel>Price per Meeting</FormLabel>
-                <Input value={`$${pricePerMeeting}`} isReadOnly bg="gray.50" />
+                <Input value={format(pricePerMeeting)} isReadOnly bg="gray.50" />
               </FormControl>
             </Stack>
           </ModalBody>

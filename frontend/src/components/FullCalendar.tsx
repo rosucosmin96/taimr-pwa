@@ -3,6 +3,7 @@ import { Box, Text, Flex, VStack, Button, HStack, Popover, PopoverTrigger, Popov
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { Meeting } from '../lib/api';
+import { useCurrency } from '../lib/currency';
 
 interface FullCalendarProps {
   meetings: Meeting[];
@@ -33,6 +34,7 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
   onAddMeeting,
   onViewMeeting
 }) => {
+  const { format } = useCurrency();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [showFullDay, setShowFullDay] = useState(false);
@@ -625,7 +627,7 @@ const FullCalendar: React.FC<FullCalendarProps> = ({
                           textOverflow="ellipsis"
                           className="responsive-text"
                         >
-                          ${meeting.price_total.toFixed(2)}
+                          {format(meeting.price_total)}
                         </Text>
                       </VStack>
                     </Box>

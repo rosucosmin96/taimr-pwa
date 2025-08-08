@@ -19,6 +19,7 @@ import {
   Box,
 } from '@chakra-ui/react';
 import { apiClient } from '../lib/api';
+import { useCurrency } from '../lib/currency';
 
 interface ServiceModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ interface ServiceModalProps {
 
 const ServiceModal: React.FC<ServiceModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const toast = useToast();
+  const { format } = useCurrency();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -132,7 +134,7 @@ const ServiceModal: React.FC<ServiceModalProps> = ({ isOpen, onClose, onSuccess 
               </FormControl>
 
               <FormControl isRequired>
-                <FormLabel>Default Price per Hour ($)</FormLabel>
+                <FormLabel>Default Price per Hour</FormLabel>
                 <Input
                   type="number"
                   value={defaultPricePerHour}
@@ -147,7 +149,7 @@ const ServiceModal: React.FC<ServiceModalProps> = ({ isOpen, onClose, onSuccess 
                 <Box p={3} bg="gray.50" borderRadius="md">
                   <Text fontSize="sm" fontWeight="medium" mb={2}>Service Summary:</Text>
                   <Text fontSize="sm" color="gray.600">
-                    {name || 'Service Name'}: {formatDuration(parseInt(defaultDurationMinutes) || 0)} • ${parseFloat(defaultPricePerHour) || 0}/h
+                    {name || 'Service Name'}: {formatDuration(parseInt(defaultDurationMinutes) || 0)} • {format(parseFloat(defaultPricePerHour) || 0)}/h
                   </Text>
                 </Box>
               )}

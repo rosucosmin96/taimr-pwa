@@ -31,6 +31,8 @@ import {
 import { apiClient, Client, Service } from '../lib/api';
 import ClientModal from '../components/ClientModal';
 import ClientViewModal from '../components/ClientViewModal';
+import { useCurrency } from '../lib/currency';
+import { CurrencyLoadingWrapper } from '../components/CurrencyLoadingWrapper';
 
 // Filter types
 interface Filters {
@@ -45,6 +47,7 @@ const Clients: React.FC = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { format } = useCurrency();
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -290,7 +293,8 @@ const Clients: React.FC = () => {
   }
 
   return (
-    <Stack spacing={8} px={{ base: 2, md: 8 }} py={4} className="container-responsive">
+    <CurrencyLoadingWrapper>
+      <Stack spacing={8} px={{ base: 2, md: 8 }} py={4} className="container-responsive">
       <Heading as="h1" size="lg" mb={4} className="responsive-heading">Clients</Heading>
 
       {/* Search and Filter Bar */}
@@ -352,9 +356,9 @@ const Clients: React.FC = () => {
                     onChange={(e) => handleFilterChange('priceRange', e.target.value)}
                   >
                     <option value="all">All Prices</option>
-                    <option value="low">Under $50/h</option>
-                    <option value="medium">$50-$100/h</option>
-                    <option value="high">Over $100/h</option>
+                    <option value="low">Under {format(50)}/h</option>
+                    <option value="medium">{format(50)}-{format(100)}/h</option>
+                    <option value="high">Over {format(100)}/h</option>
                   </Select>
                 </Box>
 
@@ -504,7 +508,7 @@ const Clients: React.FC = () => {
                     </Badge>
                     {client.custom_price_per_hour && (
                       <Badge px={2} py={0.5} borderRadius="full" bg="green.100" color="green.700" fontSize="xs" fontWeight="medium" className="responsive-label">
-                        ${client.custom_price_per_hour}/h
+                        {format(client.custom_price_per_hour)}/h
                       </Badge>
                     )}
                   </Flex>
@@ -593,6 +597,7 @@ const Clients: React.FC = () => {
         client={selectedClient}
       />
     </Stack>
+    </CurrencyLoadingWrapper>
   );
 };
 

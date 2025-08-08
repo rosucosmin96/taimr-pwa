@@ -1,41 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { PencilSquareIcon } from '@heroicons/react/24/outline';
 import { Box, Flex, Stack, Heading, Text, Button, Avatar, Spinner, Alert, AlertIcon, useToast } from '@chakra-ui/react';
-import { apiClient, Profile as UserProfile } from '../lib/api';
+import { Profile as UserProfile } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../contexts/ProfileContext';
 import EditProfileModal from '../components/EditProfileModal';
+import { CURRENCY_LABELS } from '../lib/currency';
 
 const Profile: React.FC = () => {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const { resetPassword } = useAuth();
+  const { profile, loading, error, updateProfile } = useProfile();
   const toast = useToast();
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        setLoading(true);
-        const data = await apiClient.getProfile();
-        setProfile(data);
-      } catch (err) {
-        setError('Failed to load profile');
-        console.error('Profile fetch error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, []);
 
   const handleEditProfile = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleProfileUpdated = (updatedProfile: UserProfile) => {
-    setProfile(updatedProfile);
+  const handleProfileUpdated = async (updatedProfile: UserProfile) => {
+    // Update the ProfileContext with the new profile data
+    await updateProfile({
+      name: updatedProfile.name,
+      profile_picture_url: updatedProfile.profile_picture_url,
+      currency: updatedProfile.currency,
+      tutorial_checked: updatedProfile.tutorial_checked,
+    });
   };
 
   const handleResetPassword = async () => {
@@ -119,7 +108,10 @@ const Profile: React.FC = () => {
             bg="purple.500"
           />
           <Text fontSize="2xl" fontWeight="semibold" mb={1}>{profile?.name}</Text>
-          <Text color="gray.500" mb={4}>{profile?.email}</Text>
+          <Text color="gray.500" mb={2}>{profile?.email}</Text>
+          <Text color="gray.600" mb={4} fontSize="sm">
+            Currency: {CURRENCY_LABELS[profile?.currency as keyof typeof CURRENCY_LABELS] || 'USD - US Dollar'}
+          </Text>
           <Button
             leftIcon={<PencilSquareIcon style={{ width: 20, height: 20 }} />}
             colorScheme="purple"

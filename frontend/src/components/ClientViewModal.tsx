@@ -28,6 +28,7 @@ import {
   Avatar,
 } from '@chakra-ui/react';
 import { apiClient, Service, Client } from '../lib/api';
+import { useCurrency } from '../lib/currency';
 
 interface ClientViewModalProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ interface ClientViewModalProps {
 
 const ClientViewModal: React.FC<ClientViewModalProps> = ({ isOpen, onClose, onSuccess, client }) => {
   const toast = useToast();
+  const { format } = useCurrency();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -234,7 +236,7 @@ const ClientViewModal: React.FC<ClientViewModalProps> = ({ isOpen, onClose, onSu
                       >
                         {services.map((service) => (
                           <option key={service.id} value={service.id}>
-                            {service.name} ({formatDuration(service.default_duration_minutes)} • ${service.default_price_per_hour}/h)
+                            {service.name} ({formatDuration(service.default_duration_minutes)} • {format(service.default_price_per_hour)}/h)
                           </option>
                         ))}
                       </Select>
@@ -324,7 +326,7 @@ const ClientViewModal: React.FC<ClientViewModalProps> = ({ isOpen, onClose, onSu
                             type="number"
                             value={customPricePerHour}
                             onChange={(e) => setCustomPricePerHour(e.target.value)}
-                            placeholder={`Default: $${servicePrice || 50}/h`}
+                            placeholder={`Default: ${format(servicePrice || 50)}/h`}
                             min="0"
                             step="0.01"
                           />
@@ -341,7 +343,7 @@ const ClientViewModal: React.FC<ClientViewModalProps> = ({ isOpen, onClose, onSu
                         {client.custom_price_per_hour && (
                           <HStack>
                             <Badge colorScheme="green">Custom Price</Badge>
-                            <Text fontSize="sm">${client.custom_price_per_hour}/h</Text>
+                            <Text fontSize="sm">{format(client.custom_price_per_hour)}/h</Text>
                           </HStack>
                         )}
                         {!client.custom_duration_minutes && !client.custom_price_per_hour && (
@@ -355,7 +357,7 @@ const ClientViewModal: React.FC<ClientViewModalProps> = ({ isOpen, onClose, onSu
                     <Box p={3} bg="gray.50" borderRadius="md">
                       <Text fontSize="sm" fontWeight="medium" mb={2}>Service Defaults:</Text>
                       <Text fontSize="sm" color="gray.600">
-                        Duration: {formatDuration(serviceDuration || 60)} • Price: ${servicePrice || 50}/h
+                        Duration: {formatDuration(serviceDuration || 60)} • Price: {format(servicePrice || 50)}/h
                       </Text>
                     </Box>
                   )}
@@ -366,7 +368,7 @@ const ClientViewModal: React.FC<ClientViewModalProps> = ({ isOpen, onClose, onSu
                       <Box>
                         <AlertTitle>Service Defaults</AlertTitle>
                         <AlertDescription>
-                          Duration: {formatDuration(serviceDuration || 60)} • Price: ${servicePrice || 50}/h
+                          Duration: {formatDuration(serviceDuration || 60)} • Price: {format(servicePrice || 50)}/h
                         </AlertDescription>
                       </Box>
                     </Alert>

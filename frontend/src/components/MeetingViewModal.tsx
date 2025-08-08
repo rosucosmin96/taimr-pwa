@@ -29,6 +29,7 @@ import {
 import { apiClient, Service, Client, Meeting } from '../lib/api';
 import RecurrenceUpdateDialog from './RecurrenceUpdateDialog';
 import RecurrenceDeleteDialog from './RecurrenceDeleteDialog';
+import { useCurrency } from '../lib/currency';
 
 interface MeetingViewModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ interface MeetingViewModalProps {
 
 const MeetingViewModal: React.FC<MeetingViewModalProps> = ({ isOpen, onClose, onSuccess, meeting }) => {
   const toast = useToast();
+  const { format } = useCurrency();
   const [services, setServices] = useState<Service[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,13 +90,13 @@ const MeetingViewModal: React.FC<MeetingViewModalProps> = ({ isOpen, onClose, on
   // Calculate price per meeting from price per hour
   const calculatePricePerMeeting = useCallback((hourlyRate: number) => {
     const durationHours = getMeetingDurationHours();
-    return (hourlyRate * durationHours).toFixed(2);
+    return hourlyRate * durationHours;
   }, [getMeetingDurationHours]);
 
   // Calculate price per hour from price per meeting
   const calculatePricePerHour = useCallback((meetingPrice: number) => {
     const durationHours = getMeetingDurationHours();
-    return durationHours > 0 ? (meetingPrice / durationHours).toFixed(2) : '0';
+    return durationHours > 0 ? meetingPrice / durationHours : 0;
   }, [getMeetingDurationHours]);
 
   // Handle price per hour change
@@ -103,7 +105,7 @@ const MeetingViewModal: React.FC<MeetingViewModalProps> = ({ isOpen, onClose, on
     if (!isEditingPricePerMeeting) {
       const hourlyRate = parseFloat(value) || 0;
       const meetingPrice = calculatePricePerMeeting(hourlyRate);
-      setPricePerMeeting(meetingPrice);
+      setPricePerMeeting(meetingPrice.toString());
     }
   };
 
@@ -113,7 +115,7 @@ const MeetingViewModal: React.FC<MeetingViewModalProps> = ({ isOpen, onClose, on
     if (!isEditingPricePerHour) {
       const meetingPrice = parseFloat(value) || 0;
       const hourlyRate = calculatePricePerHour(meetingPrice);
-      setPricePerHour(hourlyRate);
+      setPricePerHour(hourlyRate.toString());
     }
   };
 
@@ -122,7 +124,7 @@ const MeetingViewModal: React.FC<MeetingViewModalProps> = ({ isOpen, onClose, on
     if (pricePerHour && startTime && endTime && !isEditingPricePerHour && !isEditingPricePerMeeting && !isLoadingInitialData) {
       const hourlyRate = parseFloat(pricePerHour);
       const meetingPrice = calculatePricePerMeeting(hourlyRate);
-      setPricePerMeeting(meetingPrice);
+      setPricePerMeeting(meetingPrice.toString());
     }
   }, [startTime, endTime, pricePerHour, calculatePricePerMeeting, isEditingPricePerHour, isEditingPricePerMeeting, isLoadingInitialData]);
 
@@ -444,12 +446,12 @@ const MeetingViewModal: React.FC<MeetingViewModalProps> = ({ isOpen, onClose, on
 
                   <HStack justify="space-between">
                     <Text fontWeight="semibold">Price per Hour:</Text>
-                    <Text>${meeting.price_per_hour.toFixed(2)}</Text>
+                    <Text>{format(meeting.price_per_hour)}</Text>
                   </HStack>
 
                   <HStack justify="space-between">
                     <Text fontWeight="semibold">Price per Meeting:</Text>
-                    <Text>${meeting.price_total.toFixed(2)}</Text>
+                    <Text>{format(meeting.price_total)}</Text>
                   </HStack>
 
                   <HStack justify="space-between">

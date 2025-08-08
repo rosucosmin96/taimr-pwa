@@ -16,6 +16,15 @@ class RecurrenceUpdateScope(str, Enum):
         raise ValueError(f"Invalid RecurrenceUpdateScope: {scope_str}")
 
 
+class Currency(str, Enum):
+    USD = "USD"
+    EUR = "EUR"
+    GBP = "GBP"
+    CAD = "CAD"
+    AUD = "AUD"
+    RON = "RON"
+
+
 def ensure_utc(dt: datetime) -> datetime:
     """Convert naive or non-UTC datetime to UTC and make it aware."""
     if dt.tzinfo is None:

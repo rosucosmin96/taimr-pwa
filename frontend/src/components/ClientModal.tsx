@@ -21,6 +21,7 @@ import {
   Box,
 } from '@chakra-ui/react';
 import { apiClient, Service } from '../lib/api';
+import { useCurrency } from '../lib/currency';
 
 interface ClientModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ interface ClientModalProps {
 
 const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const toast = useToast();
+  const { format } = useCurrency();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -169,7 +171,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, onSuccess })
                   >
                     {services.map((service) => (
                       <option key={service.id} value={service.id}>
-                        {service.name} ({formatDuration(service.default_duration_minutes)} • ${service.default_price_per_hour}/h)
+                        {service.name} ({formatDuration(service.default_duration_minutes)} • {format(service.default_price_per_hour)}/h)
                       </option>
                     ))}
                   </Select>
@@ -237,7 +239,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, onSuccess })
                       type="number"
                       value={customPricePerHour}
                       onChange={(e) => setCustomPricePerHour(e.target.value)}
-                      placeholder={`Default: $${servicePrice || 50}/h`}
+                      placeholder={`Default: ${format(servicePrice || 50)}/h`}
                       min="0"
                       step="0.01"
                     />
@@ -248,7 +250,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, onSuccess })
                   <Box p={3} bg="gray.50" borderRadius="md">
                     <Text fontSize="sm" fontWeight="medium" mb={2}>Service Defaults:</Text>
                     <Text fontSize="sm" color="gray.600">
-                      Duration: {formatDuration(serviceDuration || 60)} • Price: ${servicePrice || 50}/h
+                      Duration: {formatDuration(serviceDuration || 60)} • Price: {format(servicePrice || 50)}/h
                     </Text>
                   </Box>
                 )}

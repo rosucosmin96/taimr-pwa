@@ -31,6 +31,7 @@ import {
 import { apiClient, Meeting, Client, Service, Membership } from '../lib/api';
 import MeetingModal from '../components/MeetingModal';
 import MeetingViewModal from '../components/MeetingViewModal';
+import { useCurrency } from '../lib/currency';
 
 // Filter types
 interface Filters {
@@ -48,6 +49,7 @@ const Meetings: React.FC = () => {
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { format } = useCurrency();
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -509,7 +511,7 @@ const Meetings: React.FC = () => {
                     {getServiceName(meeting.service_id)} &bull; {formatDateTime(meeting.start_time)}
                   </Text>
                   <Text fontSize="sm" color="gray.600" mt={1}>
-                    ${meeting.price_total.toFixed(2)} • {meeting.paid ? 'Paid' : 'Unpaid'}
+                    {format(meeting.price_total)} • {meeting.paid ? 'Paid' : 'Unpaid'}
                   </Text>
                   {meeting.membership_id && (
                     <Badge colorScheme="purple" size="sm" mt={1}>

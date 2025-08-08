@@ -25,6 +25,7 @@ import {
   Badge,
 } from '@chakra-ui/react';
 import { apiClient, Service } from '../lib/api';
+import { useCurrency } from '../lib/currency';
 
 interface ServiceViewModalProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ interface ServiceViewModalProps {
 
 const ServiceViewModal: React.FC<ServiceViewModalProps> = ({ isOpen, onClose, onSuccess, service }) => {
   const toast = useToast();
+  const { format } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -165,7 +167,7 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({ isOpen, onClose, on
                   <Box>
                     <Text fontSize="lg" fontWeight="bold">{service.name}</Text>
                     <Text fontSize="sm" color="gray.600">
-                      {formatDuration(service.default_duration_minutes)} • ${service.default_price_per_hour}/h
+                      {formatDuration(service.default_duration_minutes)} • {format(service.default_price_per_hour)}/h
                     </Text>
                   </Box>
                 </HStack>
@@ -214,7 +216,7 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({ isOpen, onClose, on
                   </FormControl>
 
                   <FormControl isRequired>
-                    <FormLabel>Default Price per Hour ($)</FormLabel>
+                    <FormLabel>Default Price per Hour</FormLabel>
                     {isEditing ? (
                       <Input
                         type="number"
@@ -226,7 +228,7 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({ isOpen, onClose, on
                       />
                     ) : (
                       <Box p={3} bg="gray.50" borderRadius="md">
-                        <Text>${service.default_price_per_hour.toFixed(2)}</Text>
+                        <Text>{format(service.default_price_per_hour)}</Text>
                       </Box>
                     )}
                   </FormControl>
@@ -247,7 +249,7 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({ isOpen, onClose, on
                     <Box p={3} bg="gray.50" borderRadius="md">
                       <Text fontSize="sm" fontWeight="medium" mb={2}>Service Summary:</Text>
                       <Text fontSize="sm" color="gray.600">
-                        {name || 'Service Name'}: {formatDuration(parseInt(defaultDurationMinutes) || 0)} • ${parseFloat(defaultPricePerHour) || 0}/h
+                        {name || 'Service Name'}: {formatDuration(parseInt(defaultDurationMinutes) || 0)} • {format(parseFloat(defaultPricePerHour) || 0)}/h
                       </Text>
                     </Box>
                   )}
