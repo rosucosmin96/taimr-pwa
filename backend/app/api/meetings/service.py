@@ -583,3 +583,205 @@ class MeetingService:
     async def meeting_exists(self, user_id: UUID, meeting_id: UUID) -> bool:
         """Check if a meeting exists"""
         return await self.storage.exists(user_id, meeting_id)
+
+    async def ensure_scheduled_jobs_for_existing_meetings(self) -> dict:
+        """Ensure all existing upcoming meetings have scheduled status update jobs.
+
+        Returns:
+            dict: Summary of the operation with counts and any errors
+        """
+        try:
+            logger.info(
+                "Starting scheduled jobs check for existing upcoming meetings..."
+            )
+
+            # Get all upcoming meetings from all users
+            upcoming_meetings = await self._get_all_upcoming_meetings()
+
+            if not upcoming_meetings:
+                logger.info("No upcoming meetings found, no jobs to schedule")
+                return {
+                    "total_meetings": 0,
+                    "jobs_scheduled": 0,
+                    "jobs_already_exist": 0,
+                    "meetings_skipped": 0,
+                    "errors": [],
+                    "success": True,
+                }
+
+            logger.info(f"Found {len(upcoming_meetings)} upcoming meetings to check")
+
+            # Single loop to handle filtering and job scheduling
+            from datetime import UTC, datetime
+
+            current_time = datetime.now(UTC)
+
+            jobs_scheduled = 0
+            jobs_already_exist = 0
+            meetings_skipped = 0
+            errors = []
+
+            for meeting in upcoming_meetings:
+                # Check if meeting has already ended
+                if meeting.end_time <= current_time:
+                    meetings_skipped += 1
+                    logger.info(
+                        f"Skipping meeting {meeting.id} - already ended at {meeting.end_time}"
+                    )
+                    continue
+
+                try:
+                    # Check if job already exists for this meeting
+                    job_id = f"meeting_status_update_{meeting.id}"
+
+                    if (
+                        scheduler_service.scheduler
+                        and scheduler_service.scheduler.get_job(job_id)
+                    ):
+                        jobs_already_exist += 1
+                        logger.debug(f"Job already exists for meeting {meeting.id}")
+                    else:
+                        # Schedule the job
+                        await scheduler_service.schedule_meeting_status_update(
+                            meeting.id, meeting.end_time
+                        )
+                        jobs_scheduled += 1
+                        logger.info(
+                            f"Scheduled status update job for meeting {meeting.id} at {meeting.end_time}"
+                        )
+
+                except Exception as e:
+                    error_msg = (
+                        f"Failed to schedule job for meeting {meeting.id}: {str(e)}"
+                    )
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+
+            result = {
+                "total_meetings": len(upcoming_meetings),
+                "jobs_scheduled": jobs_scheduled,
+                "jobs_already_exist": jobs_already_exist,
+                "meetings_skipped": meetings_skipped,
+                "errors": errors,
+                "success": len(errors) == 0,
+            }
+
+            logger.info(
+                f"Scheduled jobs check completed: {jobs_scheduled} new jobs, {jobs_already_exist} already exist, {meetings_skipped} past meetings skipped, {len(errors)} errors"
+            )
+            return result
+
+        except Exception as e:
+            error_msg = (
+                f"Failed to ensure scheduled jobs for existing meetings: {str(e)}"
+            )
+            logger.error(error_msg)
+            return {
+                "total_meetings": 0,
+                "jobs_scheduled": 0,
+                "jobs_already_exist": 0,
+                "meetings_skipped": 0,
+                "errors": [error_msg],
+                "success": False,
+            }
+
+    async def _get_all_upcoming_meetings(self) -> list[MeetingResponse]:
+        """Get all upcoming meetings from all users.
+
+        This method bypasses the user_id filter to get all upcoming meetings
+        across all users for the startup job scheduling.
+        """
+        try:
+            # Use direct database access to get all upcoming meetings
+            if hasattr(self.storage, "supabase"):
+                # Production: Use Supabase
+                result = (
+                    self.storage.supabase.table("meetings")
+                    .select("*")
+                    .eq("status", MeetingStatus.UPCOMING.value)
+                    .execute()
+                )
+
+                meetings = []
+                for meeting_data in result.data:
+                    # Convert to MeetingResponse format
+                    meeting = MeetingResponse(
+                        id=UUID(meeting_data["id"]),
+                        user_id=UUID(meeting_data["user_id"]),  # Include user_id
+                        service_id=UUID(meeting_data["service_id"]),
+                        client_id=UUID(meeting_data["client_id"]),
+                        title=meeting_data["title"],
+                        recurrence_id=(
+                            UUID(meeting_data["recurrence_id"])
+                            if meeting_data.get("recurrence_id")
+                            else None
+                        ),
+                        membership_id=(
+                            UUID(meeting_data["membership_id"])
+                            if meeting_data.get("membership_id")
+                            else None
+                        ),
+                        start_time=datetime.fromisoformat(meeting_data["start_time"]),
+                        end_time=datetime.fromisoformat(meeting_data["end_time"]),
+                        price_per_hour=meeting_data["price_per_hour"],
+                        price_total=meeting_data["price_total"],
+                        status=meeting_data["status"],
+                        paid=meeting_data["paid"],
+                        created_at=datetime.fromisoformat(meeting_data["created_at"]),
+                        updated_at=(
+                            datetime.fromisoformat(meeting_data["updated_at"])
+                            if meeting_data.get("updated_at")
+                            else None
+                        ),
+                    )
+                    meetings.append(meeting)
+
+            else:
+                # Development: Use SQLite
+                from sqlalchemy import create_engine
+                from sqlalchemy.orm import sessionmaker
+
+                from app.config import settings
+
+                engine = create_engine(f"sqlite:///{settings.database_path}")
+                SessionLocal = sessionmaker(
+                    autocommit=False, autoflush=False, bind=engine
+                )
+                db = SessionLocal()
+
+                try:
+                    db_meetings = (
+                        db.query(MeetingModel)
+                        .filter(MeetingModel.status == MeetingStatus.UPCOMING.value)
+                        .all()
+                    )
+
+                    meetings = []
+                    for db_meeting in db_meetings:
+                        meeting = MeetingResponse(
+                            id=db_meeting.id,
+                            user_id=db_meeting.user_id,  # Include user_id
+                            service_id=db_meeting.service_id,
+                            client_id=db_meeting.client_id,
+                            title=db_meeting.title,
+                            recurrence_id=db_meeting.recurrence_id,
+                            membership_id=db_meeting.membership_id,
+                            start_time=db_meeting.start_time,
+                            end_time=db_meeting.end_time,
+                            price_per_hour=db_meeting.price_per_hour,
+                            price_total=db_meeting.price_total,
+                            status=db_meeting.status,
+                            paid=db_meeting.paid,
+                            created_at=db_meeting.created_at,
+                            updated_at=db_meeting.updated_at,
+                        )
+                        meetings.append(meeting)
+
+                finally:
+                    db.close()
+
+            return meetings
+
+        except Exception as e:
+            logger.error(f"Failed to get all upcoming meetings: {e}")
+            return []
