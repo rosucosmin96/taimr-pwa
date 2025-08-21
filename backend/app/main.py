@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -35,10 +37,48 @@ def init_database():
         print("Supabase tables are managed via migrations. No action taken.")
 
 
-def init_scheduler_jobs():
+async def init_scheduler_jobs():
     """Initialize scheduled jobs for existing upcoming meetings."""
-    print("Scheduler job initialization is handled by the scheduler service.")
-    return True
+    try:
+        from app.api.meetings.service import MeetingService
+
+        meeting_service = MeetingService()
+        result = await meeting_service.ensure_scheduled_jobs_for_existing_meetings()
+
+        if result["success"]:
+            print(
+                f"✅ Scheduled jobs initialized: {result['jobs_scheduled']} new jobs, {result['jobs_already_exist']} already exist"
+            )
+            if result["errors"]:
+                print(f"⚠️  Some errors occurred: {len(result['errors'])} errors")
+                for error in result["errors"]:
+                    print(f"   - {error}")
+        else:
+            print(
+                f"❌ Failed to initialize scheduled jobs: {len(result['errors'])} errors"
+            )
+            for error in result["errors"]:
+                print(f"   - {error}")
+
+        return result["success"]
+
+    except Exception as e:
+        print(f"❌ Error initializing scheduled jobs: {e}")
+        return False
+
+
+async def background_init_scheduler_jobs():
+    """Background task to initialize scheduled jobs without blocking startup."""
+    # Small delay to ensure the app is fully started
+    await asyncio.sleep(1)
+
+    if settings.enable_meeting_status_updates:
+        print("🔄 Initializing scheduled jobs for existing meetings in background...")
+        success = await init_scheduler_jobs()
+        if success:
+            print("✅ Scheduler jobs initialized successfully")
+        else:
+            print("⚠️  Scheduler jobs initialization failed")
 
 
 # Initialize database on startup
@@ -50,14 +90,9 @@ async def startup_event():
     # Start the scheduler for meeting status updates
     await scheduler_service.start()
 
-    # Initialize scheduled jobs for existing upcoming meetings
-    if settings.enable_meeting_status_updates:
-        print("🔄 Initializing scheduled jobs for existing meetings...")
-        success = init_scheduler_jobs()
-        if success:
-            print("✅ Scheduler jobs initialized successfully")
-        else:
-            print("⚠️  Scheduler jobs initialization failed")
+    # Initialize scheduled jobs for existing upcoming meetings in background
+    # This won't block the app startup
+    asyncio.create_task(background_init_scheduler_jobs())
 
 
 # CORS middleware

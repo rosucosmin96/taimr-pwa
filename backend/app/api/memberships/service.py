@@ -89,13 +89,13 @@ class MembershipService:
             update_data["total_meetings"] = membership.total_meetings
             # Recalculate price per meeting
             update_data["price_per_meeting"] = (
-                existing_membership["price_per_membership"] / membership.total_meetings
+                existing_membership.price_per_membership / membership.total_meetings
             )
         if membership.price_per_membership is not None:
             update_data["price_per_membership"] = membership.price_per_membership
             # Recalculate price per meeting
             update_data["price_per_meeting"] = (
-                membership.price_per_membership / existing_membership["total_meetings"]
+                membership.price_per_membership / existing_membership.total_meetings
             )
         if membership.availability_days is not None:
             update_data["availability_days"] = membership.availability_days
