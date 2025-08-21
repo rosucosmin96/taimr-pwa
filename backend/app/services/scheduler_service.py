@@ -30,6 +30,184 @@ class SupabaseJobStore(BaseJobStore):
         super().start(scheduler, alias)
         self._scheduler = scheduler
 
+    def _decode_job_state(self, job_state_raw, job_id=None):
+        """Decode job state from Supabase BYTEA format with improved error handling."""
+        try:
+            # Convert Supabase BYTEA format to bytes
+            if (
+                isinstance(job_state_raw, dict)
+                and job_state_raw.get("type") == "Buffer"
+            ):
+                # Supabase returns BYTEA as {"type": "Buffer", "data": [...]}
+                job_state_bytes = bytes(job_state_raw["data"])
+            elif isinstance(job_state_raw, str):
+                # Handle different string formats
+                if job_state_raw.startswith("\\x"):
+                    # Escaped hex string like '\x80\x04\x95...'
+                    job_state_bytes, _ = codecs.escape_decode(
+                        job_state_raw.encode("latin1")
+                    )
+                elif job_state_raw.startswith("x"):
+                    # Hex string without escape characters
+                    job_state_bytes = bytes.fromhex(job_state_raw[1:])
+                else:
+                    # Try to decode as base64 directly
+                    try:
+                        job_state_bytes = base64.b64decode(job_state_raw)
+                    except Exception:
+                        # If that fails, try to decode as UTF-8 and then base64
+                        job_state_bytes = base64.b64decode(
+                            job_state_raw.encode("utf-8")
+                        )
+            else:
+                # Fallback for other formats
+                job_state_bytes = job_state_raw
+
+            # Try multiple decoding strategies
+            job_data = None
+
+            # Strategy 1: Try base64 decode then JSON
+            try:
+                job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
+                job_data = json.loads(job_state_json)
+                logger.debug(
+                    f"Successfully decoded job {job_id} using base64+JSON strategy"
+                )
+            except Exception as e1:
+                logger.debug(f"Base64+JSON strategy failed for job {job_id}: {e1}")
+
+                # Strategy 2: Try direct JSON decode
+                try:
+                    if isinstance(job_state_bytes, bytes):
+                        job_state_json = job_state_bytes.decode("utf-8")
+                    else:
+                        job_state_json = str(job_state_bytes)
+                    job_data = json.loads(job_state_json)
+                    logger.debug(
+                        f"Successfully decoded job {job_id} using direct JSON strategy"
+                    )
+                except Exception as e2:
+                    logger.debug(f"Direct JSON strategy failed for job {job_id}: {e2}")
+
+                    # Strategy 3: Try to fix common JSON issues
+                    try:
+                        if isinstance(job_state_bytes, bytes):
+                            job_state_json = job_state_bytes.decode("utf-8")
+                        else:
+                            job_state_json = str(job_state_bytes)
+
+                        # Try to fix common JSON formatting issues
+                        # Remove any leading/trailing whitespace and non-printable characters
+                        job_state_json = job_state_json.strip()
+                        # Remove any null bytes
+                        job_state_json = job_state_json.replace("\x00", "")
+
+                        job_data = json.loads(job_state_json)
+                        logger.debug(
+                            f"Successfully decoded job {job_id} using cleaned JSON strategy"
+                        )
+                    except Exception as e3:
+                        logger.debug(
+                            f"Cleaned JSON strategy failed for job {job_id}: {e3}"
+                        )
+
+                        # Strategy 4: Try to extract JSON from the data
+                        try:
+                            if isinstance(job_state_bytes, bytes):
+                                job_state_json = job_state_bytes.decode(
+                                    "utf-8", errors="ignore"
+                                )
+                            else:
+                                job_state_json = str(job_state_bytes)
+
+                            # Look for JSON-like content
+                            import re
+
+                            json_match = re.search(r"\{.*\}", job_state_json, re.DOTALL)
+                            if json_match:
+                                job_data = json.loads(json_match.group())
+                                logger.debug(
+                                    f"Successfully decoded job {job_id} using regex JSON extraction"
+                                )
+                            else:
+                                raise Exception("No JSON content found")
+                        except Exception as e4:
+                            logger.debug(
+                                f"Regex JSON extraction failed for job {job_id}: {e4}"
+                            )
+
+                            # Strategy 5: Try Python pickle decode (for legacy data)
+                            try:
+                                import pickle
+
+                                job_data = pickle.loads(job_state_bytes)
+                                logger.debug(
+                                    f"Successfully decoded job {job_id} using pickle strategy"
+                                )
+                            except Exception as e5:
+                                logger.debug(
+                                    f"Pickle strategy failed for job {job_id}: {e5}"
+                                )
+
+                                # Strategy 6: Try to create a minimal job state from the job ID
+                                try:
+                                    # Extract meeting ID from job ID
+                                    if job_id and job_id.startswith(
+                                        "meeting_status_update_"
+                                    ):
+                                        meeting_id = job_id.replace(
+                                            "meeting_status_update_", ""
+                                        )
+                                        # Create a minimal job state that can be reconstructed
+                                        job_data = {
+                                            "id": job_id,
+                                            "func": "update_meeting_status",
+                                            "trigger": "date",
+                                            "args": [meeting_id],
+                                            "kwargs": {},
+                                            "next_run_time": None,  # Will be set by the scheduler
+                                            "misfire_grace_time": None,
+                                            "coalesce": False,
+                                            "max_instances": 1,
+                                        }
+                                        logger.debug(
+                                            f"Created minimal job state for {job_id} from job ID"
+                                        )
+                                    else:
+                                        raise Exception(
+                                            "Cannot create minimal job state"
+                                        )
+                                except Exception as e6:
+                                    logger.debug(
+                                        f"Minimal job state creation failed for job {job_id}: {e6}"
+                                    )
+                                    # All strategies failed
+                                    raise Exception(
+                                        f"All decoding strategies failed: {e1}, {e2}, {e3}, {e4}, {e5}, {e6}"
+                                    ) from e6
+
+            if job_data is None:
+                raise Exception("Failed to decode job data")
+
+            # Convert back to job state format
+            job_state = {
+                "id": job_data.get("id"),
+                "func": job_data.get("func"),
+                "trigger": job_data.get("trigger"),
+                "args": job_data.get("args", []),
+                "kwargs": job_data.get("kwargs", {}),
+                "next_run_time": job_data.get("next_run_time"),
+                "misfire_grace_time": job_data.get("misfire_grace_time"),
+                "coalesce": job_data.get("coalesce", False),
+                "max_instances": job_data.get("max_instances", 1),
+            }
+
+            return job_state
+
+        except Exception as e:
+            logger.warning(f"Error decoding job state for {job_id or 'unknown'}: {e}")
+            return None
+
     def lookup_job(self, job_id):
         """Look up a job by its ID."""
         try:
@@ -41,42 +219,8 @@ class SupabaseJobStore(BaseJobStore):
                 job_data = result.data[0]
                 job_state_raw = job_data["job_state"]
 
-                # Convert Supabase BYTEA format to bytes
-                if (
-                    isinstance(job_state_raw, dict)
-                    and job_state_raw.get("type") == "Buffer"
-                ):
-                    # Supabase returns BYTEA as {"type": "Buffer", "data": [...]}
-                    job_state_bytes = bytes(job_state_raw["data"])
-                elif isinstance(job_state_raw, str):
-                    # Supabase returns BYTEA as escaped hex string like '\x80\x04\x95...'
-                    # Convert the escaped hex string back to bytes
-                    job_state_bytes, _ = codecs.escape_decode(
-                        job_state_raw.encode("latin1")
-                    )
-                else:
-                    # Fallback for other formats
-                    job_state_bytes = job_state_raw
-
-                try:
-                    # Decode JSON data
-                    job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
-                    job_data = json.loads(job_state_json)
-
-                    # Convert back to job state format
-                    job_state = {
-                        "id": job_data.get("id"),
-                        "func": job_data.get("func"),
-                        "trigger": job_data.get("trigger"),
-                        "args": job_data.get("args", []),
-                        "kwargs": job_data.get("kwargs", {}),
-                        "next_run_time": job_data.get("next_run_time"),
-                        "misfire_grace_time": job_data.get("misfire_grace_time"),
-                        "coalesce": job_data.get("coalesce", False),
-                        "max_instances": job_data.get("max_instances", 1),
-                    }
-                except Exception as e:
-                    logger.warning(f"Error decoding job state for {job_id}: {e}")
+                job_state = self._decode_job_state(job_state_raw, job_id)
+                if job_state is None:
                     # Try to delete the corrupted job silently
                     try:
                         self.remove_job(job_id)
@@ -100,52 +244,17 @@ class SupabaseJobStore(BaseJobStore):
     def get_due_jobs(self, now):
         """Get jobs that are due to run."""
         try:
-            # Get all jobs and filter by due time
             result = self.supabase.rpc("get_all_scheduler_jobs").execute()
             due_jobs = []
 
             for job_data in result.data:
                 job_state_raw = job_data["job_state"]
+                job_id = job_data.get("id")
 
-                # Convert Supabase BYTEA format to bytes
-                if (
-                    isinstance(job_state_raw, dict)
-                    and job_state_raw.get("type") == "Buffer"
-                ):
-                    # Supabase returns BYTEA as {"type": "Buffer", "data": [...]}
-                    job_state_bytes = bytes(job_state_raw["data"])
-                elif isinstance(job_state_raw, str):
-                    # Supabase returns BYTEA as escaped hex string like '\x80\x04\x95...'
-                    # Convert the escaped hex string back to bytes
-                    job_state_bytes, _ = codecs.escape_decode(
-                        job_state_raw.encode("latin1")
-                    )
-                else:
-                    # Fallback for other formats
-                    job_state_bytes = job_state_raw
-
-                try:
-                    # Decode JSON data
-                    job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
-                    job_data_json = json.loads(job_state_json)
-
-                    # Convert back to job state format
-                    job_state = {
-                        "id": job_data_json.get("id"),
-                        "func": job_data_json.get("func"),
-                        "trigger": job_data_json.get("trigger"),
-                        "args": job_data_json.get("args", []),
-                        "kwargs": job_data_json.get("kwargs", {}),
-                        "next_run_time": job_data_json.get("next_run_time"),
-                        "misfire_grace_time": job_data_json.get("misfire_grace_time"),
-                        "coalesce": job_data_json.get("coalesce", False),
-                        "max_instances": job_data_json.get("max_instances", 1),
-                    }
-                except Exception as e:
-                    logger.warning(f"Error decoding job state: {e}")
+                job_state = self._decode_job_state(job_state_raw, job_id)
+                if job_state is None:
                     # Try to delete the corrupted job silently
                     try:
-                        job_id = job_data.get("id")
                         if job_id:
                             self.remove_job(job_id)
                             logger.info(f"Cleaned up corrupted job {job_id}")
@@ -175,46 +284,12 @@ class SupabaseJobStore(BaseJobStore):
 
             for job_data in result.data:
                 job_state_raw = job_data["job_state"]
+                job_id = job_data.get("id")
 
-                # Convert Supabase BYTEA format to bytes
-                if (
-                    isinstance(job_state_raw, dict)
-                    and job_state_raw.get("type") == "Buffer"
-                ):
-                    # Supabase returns BYTEA as {"type": "Buffer", "data": [...]}
-                    job_state_bytes = bytes(job_state_raw["data"])
-                elif isinstance(job_state_raw, str):
-                    # Supabase returns BYTEA as escaped hex string like '\x80\x04\x95...'
-                    # Convert the escaped hex string back to bytes
-                    job_state_bytes, _ = codecs.escape_decode(
-                        job_state_raw.encode("latin1")
-                    )
-                else:
-                    # Fallback for other formats
-                    job_state_bytes = job_state_raw
-
-                try:
-                    # Decode JSON data
-                    job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
-                    job_data_json = json.loads(job_state_json)
-
-                    # Convert back to job state format
-                    job_state = {
-                        "id": job_data_json.get("id"),
-                        "func": job_data_json.get("func"),
-                        "trigger": job_data_json.get("trigger"),
-                        "args": job_data_json.get("args", []),
-                        "kwargs": job_data_json.get("kwargs", {}),
-                        "next_run_time": job_data_json.get("next_run_time"),
-                        "misfire_grace_time": job_data_json.get("misfire_grace_time"),
-                        "coalesce": job_data_json.get("coalesce", False),
-                        "max_instances": job_data_json.get("max_instances", 1),
-                    }
-                except Exception as e:
-                    logger.error(f"Error decoding job state: {e}")
+                job_state = self._decode_job_state(job_state_raw, job_id)
+                if job_state is None:
                     # Try to delete the corrupted job
                     try:
-                        job_id = job_data.get("id")
                         if job_id:
                             self.remove_job(job_id)
                             logger.info(f"Deleted corrupted job {job_id}")
@@ -305,46 +380,12 @@ class SupabaseJobStore(BaseJobStore):
 
             for job_data in result.data:
                 job_state_raw = job_data["job_state"]
+                job_id = job_data.get("id")
 
-                # Convert Supabase BYTEA format to bytes
-                if (
-                    isinstance(job_state_raw, dict)
-                    and job_state_raw.get("type") == "Buffer"
-                ):
-                    # Supabase returns BYTEA as {"type": "Buffer", "data": [...]}
-                    job_state_bytes = bytes(job_state_raw["data"])
-                elif isinstance(job_state_raw, str):
-                    # Supabase returns BYTEA as escaped hex string like '\x80\x04\x95...'
-                    # Convert the escaped hex string back to bytes
-                    job_state_bytes, _ = codecs.escape_decode(
-                        job_state_raw.encode("latin1")
-                    )
-                else:
-                    # Fallback for other formats
-                    job_state_bytes = job_state_raw
-
-                try:
-                    # Decode JSON data
-                    job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
-                    job_data_json = json.loads(job_state_json)
-
-                    # Convert back to job state format
-                    job_state = {
-                        "id": job_data_json.get("id"),
-                        "func": job_data_json.get("func"),
-                        "trigger": job_data_json.get("trigger"),
-                        "args": job_data_json.get("args", []),
-                        "kwargs": job_data_json.get("kwargs", {}),
-                        "next_run_time": job_data_json.get("next_run_time"),
-                        "misfire_grace_time": job_data_json.get("misfire_grace_time"),
-                        "coalesce": job_data_json.get("coalesce", False),
-                        "max_instances": job_data_json.get("max_instances", 1),
-                    }
-                except Exception as e:
-                    logger.error(f"Error decoding job state: {e}")
+                job_state = self._decode_job_state(job_state_raw, job_id)
+                if job_state is None:
                     # Try to delete the corrupted job
                     try:
-                        job_id = job_data.get("id")
                         if job_id:
                             self.remove_job(job_id)
                             logger.info(f"Deleted corrupted job {job_id}")
@@ -575,29 +616,28 @@ class SchedulerService:
             for job_data in result.data:
                 try:
                     job_state_raw = job_data["job_state"]
+                    job_id = job_data.get("id")
 
-                    # Convert Supabase BYTEA format to bytes
-                    if (
-                        isinstance(job_state_raw, dict)
-                        and job_state_raw.get("type") == "Buffer"
-                    ):
-                        job_state_bytes = bytes(job_state_raw["data"])
-                    elif isinstance(job_state_raw, str):
-                        job_state_bytes, _ = codecs.escape_decode(
-                            job_state_raw.encode("latin1")
-                        )
-                    else:
-                        job_state_bytes = job_state_raw
-
-                    # Decode JSON data
-                    job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
-                    job_data_json = json.loads(job_state_json)
+                    # Use the improved decoding method
+                    job_state = self._decode_job_state_for_loading(
+                        job_state_raw, job_id
+                    )
+                    if job_state is None:
+                        # Try to delete corrupted job
+                        try:
+                            if job_id:
+                                self.supabase_client.rpc(
+                                    "delete_scheduler_job", {"job_id": job_id}
+                                ).execute()
+                                logger.info(f"Cleaned up corrupted job {job_id}")
+                        except Exception as del_e:
+                            logger.debug(f"Failed to clean up job {job_id}: {del_e}")
+                        continue
 
                     # Recreate job
-                    job_id = job_data_json.get("id")
-                    args = job_data_json.get("args", [])
-                    kwargs = job_data_json.get("kwargs", {})
-                    next_run_time_str = job_data_json.get("next_run_time")
+                    args = job_state.get("args", [])
+                    kwargs = job_state.get("kwargs", {})
+                    next_run_time_str = job_state.get("next_run_time")
 
                     if next_run_time_str:
                         next_run_time = datetime.fromisoformat(next_run_time_str)
@@ -631,10 +671,179 @@ class SchedulerService:
         except Exception as e:
             logger.error(f"Error loading jobs from Supabase: {e}")
 
+    def _decode_job_state_for_loading(self, job_state_raw, job_id=None):
+        """Decode job state for loading from Supabase (similar to _decode_job_state but for SchedulerService)."""
+        try:
+            # Convert Supabase BYTEA format to bytes
+            if (
+                isinstance(job_state_raw, dict)
+                and job_state_raw.get("type") == "Buffer"
+            ):
+                # Supabase returns BYTEA as {"type": "Buffer", "data": [...]}
+                job_state_bytes = bytes(job_state_raw["data"])
+            elif isinstance(job_state_raw, str):
+                # Handle different string formats
+                if job_state_raw.startswith("\\x"):
+                    # Escaped hex string like '\x80\x04\x95...'
+                    job_state_bytes, _ = codecs.escape_decode(
+                        job_state_raw.encode("latin1")
+                    )
+                elif job_state_raw.startswith("x"):
+                    # Hex string without escape characters
+                    job_state_bytes = bytes.fromhex(job_state_raw[1:])
+                else:
+                    # Try to decode as base64 directly
+                    try:
+                        job_state_bytes = base64.b64decode(job_state_raw)
+                    except Exception:
+                        # If that fails, try to decode as UTF-8 and then base64
+                        job_state_bytes = base64.b64decode(
+                            job_state_raw.encode("utf-8")
+                        )
+            else:
+                # Fallback for other formats
+                job_state_bytes = job_state_raw
+
+            # Try multiple decoding strategies
+            job_data = None
+
+            # Strategy 1: Try base64 decode then JSON
+            try:
+                job_state_json = base64.b64decode(job_state_bytes).decode("utf-8")
+                job_data = json.loads(job_state_json)
+                logger.debug(
+                    f"Successfully decoded job {job_id} using base64+JSON strategy"
+                )
+            except Exception as e1:
+                logger.debug(f"Base64+JSON strategy failed for job {job_id}: {e1}")
+
+                # Strategy 2: Try direct JSON decode
+                try:
+                    if isinstance(job_state_bytes, bytes):
+                        job_state_json = job_state_bytes.decode("utf-8")
+                    else:
+                        job_state_json = str(job_state_bytes)
+                    job_data = json.loads(job_state_json)
+                    logger.debug(
+                        f"Successfully decoded job {job_id} using direct JSON strategy"
+                    )
+                except Exception as e2:
+                    logger.debug(f"Direct JSON strategy failed for job {job_id}: {e2}")
+
+                    # Strategy 3: Try to fix common JSON issues
+                    try:
+                        if isinstance(job_state_bytes, bytes):
+                            job_state_json = job_state_bytes.decode("utf-8")
+                        else:
+                            job_state_json = str(job_state_bytes)
+
+                        # Try to fix common JSON formatting issues
+                        # Remove any leading/trailing whitespace and non-printable characters
+                        job_state_json = job_state_json.strip()
+                        # Remove any null bytes
+                        job_state_json = job_state_json.replace("\x00", "")
+
+                        job_data = json.loads(job_state_json)
+                        logger.debug(
+                            f"Successfully decoded job {job_id} using cleaned JSON strategy"
+                        )
+                    except Exception as e3:
+                        logger.debug(
+                            f"Cleaned JSON strategy failed for job {job_id}: {e3}"
+                        )
+
+                        # Strategy 4: Try to extract JSON from the data
+                        try:
+                            if isinstance(job_state_bytes, bytes):
+                                job_state_json = job_state_bytes.decode(
+                                    "utf-8", errors="ignore"
+                                )
+                            else:
+                                job_state_json = str(job_state_bytes)
+
+                            # Look for JSON-like content
+                            import re
+
+                            json_match = re.search(r"\{.*\}", job_state_json, re.DOTALL)
+                            if json_match:
+                                job_data = json.loads(json_match.group())
+                                logger.debug(
+                                    f"Successfully decoded job {job_id} using regex JSON extraction"
+                                )
+                            else:
+                                raise Exception("No JSON content found")
+                        except Exception as e4:
+                            logger.debug(
+                                f"Regex JSON extraction failed for job {job_id}: {e4}"
+                            )
+
+                            # Strategy 5: Try Python pickle decode (for legacy data)
+                            try:
+                                import pickle
+
+                                job_data = pickle.loads(job_state_bytes)
+                                logger.debug(
+                                    f"Successfully decoded job {job_id} using pickle strategy"
+                                )
+                            except Exception as e5:
+                                logger.debug(
+                                    f"Pickle strategy failed for job {job_id}: {e5}"
+                                )
+
+                                # Strategy 6: Try to create a minimal job state from the job ID
+                                try:
+                                    # Extract meeting ID from job ID
+                                    if job_id and job_id.startswith(
+                                        "meeting_status_update_"
+                                    ):
+                                        meeting_id = job_id.replace(
+                                            "meeting_status_update_", ""
+                                        )
+                                        # Create a minimal job state that can be reconstructed
+                                        job_data = {
+                                            "id": job_id,
+                                            "func": "update_meeting_status",
+                                            "trigger": "date",
+                                            "args": [meeting_id],
+                                            "kwargs": {},
+                                            "next_run_time": None,  # Will be set by the scheduler
+                                            "misfire_grace_time": None,
+                                            "coalesce": False,
+                                            "max_instances": 1,
+                                        }
+                                        logger.debug(
+                                            f"Created minimal job state for {job_id} from job ID"
+                                        )
+                                    else:
+                                        raise Exception(
+                                            "Cannot create minimal job state"
+                                        )
+                                except Exception as e6:
+                                    logger.debug(
+                                        f"Minimal job state creation failed for job {job_id}: {e6}"
+                                    )
+                                    # All strategies failed
+                                    raise Exception(
+                                        f"All decoding strategies failed: {e1}, {e2}, {e3}, {e4}, {e5}, {e6}"
+                                    ) from e6
+
+            if job_data is None:
+                raise Exception("Failed to decode job data")
+
+            return job_data
+
+        except Exception as e:
+            logger.warning(f"Error decoding job state for {job_id or 'unknown'}: {e}")
+            return None
+
 
 def update_meeting_status(meeting_id: str):
     """Standalone function to update meeting status from 'upcoming' to 'done' when meeting ends."""
     try:
+        from datetime import UTC, datetime
+
+        current_time = datetime.now(UTC)
+
         if settings.environment == "dev":
             # Use SQLite for development - direct database access for scheduler
             from sqlalchemy import create_engine
@@ -656,10 +865,20 @@ def update_meeting_status(meeting_id: str):
                 db.close()
                 return
 
+            # Check if the meeting has actually ended
+            if meeting.end_time > current_time:
+                logger.info(
+                    f"Meeting {meeting_id} has not ended yet (ends at {meeting.end_time}), skipping update"
+                )
+                db.close()
+                return
+
             if meeting.status == MeetingStatus.UPCOMING.value:
                 meeting.status = MeetingStatus.DONE.value
                 db.commit()
-                logger.info(f"Updated meeting {meeting_id} status to 'done'")
+                logger.info(
+                    f"Updated meeting {meeting_id} status to 'done' (ended at {meeting.end_time})"
+                )
             else:
                 logger.info(
                     f"Meeting {meeting_id} status is already '{meeting.status}', skipping update"
@@ -687,6 +906,16 @@ def update_meeting_status(meeting_id: str):
                 logger.warning(f"Meeting {meeting_id} not found for status update")
                 return
 
+            # Check if the meeting has actually ended
+            end_time_str = meeting_data.get("end_time")
+            if end_time_str:
+                end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+                if end_time > current_time:
+                    logger.info(
+                        f"Meeting {meeting_id} has not ended yet (ends at {end_time}), skipping update"
+                    )
+                    return
+
             if meeting_data.get("status") == "upcoming":
                 # Update the meeting status
                 result = (
@@ -696,7 +925,9 @@ def update_meeting_status(meeting_id: str):
                     .execute()
                 )
                 if result.data:
-                    logger.info(f"Updated meeting {meeting_id} status to 'done'")
+                    logger.info(
+                        f"Updated meeting {meeting_id} status to 'done' (ended at {end_time_str})"
+                    )
                 else:
                     logger.error(f"Failed to update meeting {meeting_id} status")
             else:
