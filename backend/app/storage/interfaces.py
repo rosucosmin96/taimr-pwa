@@ -12,9 +12,12 @@ class StorageServiceInterface(ABC, Generic[T]):
 
     @abstractmethod
     async def get_all(
-        self, user_id: UUID, filters: dict[str, Any] | None = None
+        self,
+        user_id: UUID,
+        filters: dict[str, Any] | None = None,
+        order_by: str | None = None,
     ) -> list[T]:
-        """Get all records for a user with optional filters."""
+        """Get all records for a user with optional filters and ordering."""
         pass
 
     @abstractmethod

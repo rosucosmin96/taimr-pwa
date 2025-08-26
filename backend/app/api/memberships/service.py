@@ -89,13 +89,13 @@ class MembershipService:
             update_data["total_meetings"] = membership.total_meetings
             # Recalculate price per meeting
             update_data["price_per_meeting"] = (
-                existing_membership["price_per_membership"] / membership.total_meetings
+                existing_membership.price_per_membership / membership.total_meetings
             )
         if membership.price_per_membership is not None:
             update_data["price_per_membership"] = membership.price_per_membership
             # Recalculate price per meeting
             update_data["price_per_meeting"] = (
-                membership.price_per_membership / existing_membership["total_meetings"]
+                membership.price_per_membership / existing_membership.total_meetings
             )
         if membership.availability_days is not None:
             update_data["availability_days"] = membership.availability_days
@@ -116,16 +116,25 @@ class MembershipService:
         return updated_membership
 
     async def delete_membership(self, user_id: UUID, membership_id: UUID) -> None:
-        """Delete (cancel) a membership."""
+        """Delete a membership and all its related meetings."""
         # Check if membership exists
         existing_membership = await self.storage.get_by_id(user_id, membership_id)
         if not existing_membership:
             raise ValueError("Membership not found")
 
-        # Cancel the membership instead of deleting
-        await self.storage.update(
-            user_id, membership_id, {"status": MembershipStatus.CANCELED.value}
+        # Get all meetings for this membership
+        meetings = await self.meeting_storage.get_all(
+            user_id, {"membership_id": str(membership_id)}
         )
+
+        # Delete all related meetings first
+        for meeting in meetings:
+            await self.meeting_storage.delete(user_id, UUID(meeting["id"]))
+
+        # Delete the membership
+        deleted = await self.storage.delete(user_id, membership_id)
+        if not deleted:
+            raise ValueError("Failed to delete membership")
 
     async def get_active_membership(
         self, user_id: UUID, client_id: UUID

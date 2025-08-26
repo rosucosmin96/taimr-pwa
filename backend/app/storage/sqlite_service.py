@@ -22,9 +22,12 @@ class SQLiteService(StorageServiceInterface[T]):
         self.response_class = response_class
 
     async def get_all(
-        self, user_id: UUID, filters: dict[str, Any] | None = None
+        self,
+        user_id: UUID,
+        filters: dict[str, Any] | None = None,
+        order_by: str | None = None,
     ) -> list[T]:
-        """Get all records for a user with optional filters."""
+        """Get all records for a user with optional filters and ordering."""
         query = self.db.query(self.model_class).filter(
             self.model_class.user_id == str(user_id)
         )
@@ -38,6 +41,16 @@ class SQLiteService(StorageServiceInterface[T]):
                     else:
                         # Simple equality filter
                         query = query.filter(getattr(self.model_class, key) == value)
+
+        # Apply ordering if specified
+        if order_by:
+            if hasattr(self.model_class, order_by):
+                field = getattr(self.model_class, order_by)
+                query = query.order_by(field)
+            else:
+                # Default to created_at if specified field doesn't exist
+                if hasattr(self.model_class, "created_at"):
+                    query = query.order_by(self.model_class.created_at)
 
         records = query.all()
         return [self._to_response(record) for record in records]

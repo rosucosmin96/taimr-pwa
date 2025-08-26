@@ -25,9 +25,10 @@ import MembershipDeleteModal from './MembershipDeleteModal';
 interface MembershipViewModalProps {
   membership: Membership;
   onClose: () => void;
+  onRefresh?: () => void;
 }
 
-const MembershipViewModal: React.FC<MembershipViewModalProps> = ({ membership, onClose }) => {
+const MembershipViewModal: React.FC<MembershipViewModalProps> = ({ membership, onClose, onRefresh }) => {
   const { format } = useCurrency();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,6 +135,7 @@ const MembershipViewModal: React.FC<MembershipViewModalProps> = ({ membership, o
         onSuccess={(updated) => {
           setCurrentMembership(updated);
           setEditOpen(false);
+          onRefresh?.();
         }}
       />
       {/* Delete Modal */}
@@ -144,6 +146,7 @@ const MembershipViewModal: React.FC<MembershipViewModalProps> = ({ membership, o
         onSuccess={() => {
           setDeleteOpen(false);
           onClose();
+          onRefresh?.();
         }}
       />
     </Modal>

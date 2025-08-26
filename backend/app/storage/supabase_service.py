@@ -20,9 +20,12 @@ class SupabaseService(StorageServiceInterface[T]):
         self.response_class = response_class
 
     async def get_all(
-        self, user_id: UUID, filters: dict[str, Any] | None = None
+        self,
+        user_id: UUID,
+        filters: dict[str, Any] | None = None,
+        order_by: str | None = None,
     ) -> list[T]:
-        """Get all records for a user with optional filters."""
+        """Get all records for a user with optional filters and ordering."""
         # Special case for users table - it doesn't have a user_id column
         if self.table_name == "users":
             query = self.supabase.table(self.table_name).select("*")
@@ -57,6 +60,12 @@ class SupabaseService(StorageServiceInterface[T]):
                 else:
                     # Simple equality filter
                     query = query.eq(key, value)
+
+        # Apply ordering if specified
+        if order_by:
+            # Check if the field exists in the table schema
+            # For now, we'll assume created_at exists and order by it
+            query = query.order(order_by, desc=False)
 
         result = query.execute()
         return [self._to_response(record) for record in result.data]

@@ -45,7 +45,8 @@ class MeetingService:
             filters["status"] = status
 
         # Get all meetings first, then filter by date if needed
-        meetings = await self.storage.get_all(user_id, filters)
+        # Order by creation date (newest first)
+        meetings = await self.storage.get_all(user_id, filters, order_by="start_time")
 
         # Filter by date if provided
         if date_filter:

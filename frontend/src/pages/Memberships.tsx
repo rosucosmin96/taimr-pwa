@@ -152,14 +152,21 @@ const Memberships: React.FC = () => {
     setServiceFilter('all');
   };
 
-  const handleAddSuccess = () => {
-    setAddModalOpen(false);
-    // Refresh memberships after adding
+  // Centralized refresh function
+  const refreshMemberships = () => {
     setLoading(true);
     apiClient.getMemberships().then((membershipsData) => {
       setMemberships(membershipsData);
       setLoading(false);
+    }).catch((err) => {
+      setError('Failed to refresh memberships');
+      setLoading(false);
     });
+  };
+
+  const handleAddSuccess = () => {
+    setAddModalOpen(false);
+    refreshMemberships();
   };
 
   // Row click handler
@@ -371,6 +378,7 @@ const Memberships: React.FC = () => {
         <MembershipViewModal
           membership={selectedMembership}
           onClose={() => setSelectedMembership(null)}
+          onRefresh={refreshMemberships}
         />
       )}
 
@@ -387,11 +395,7 @@ const Memberships: React.FC = () => {
         onSuccess={() => {
           setBatchEditOpen(false);
           setSelectedIds([]);
-          setLoading(true);
-          apiClient.getMemberships().then((membershipsData) => {
-            setMemberships(membershipsData);
-            setLoading(false);
-          });
+          refreshMemberships();
         }}
       />
       {/* Batch Delete Modal */}
@@ -402,11 +406,7 @@ const Memberships: React.FC = () => {
         onSuccess={() => {
           setBatchDeleteOpen(false);
           setSelectedIds([]);
-          setLoading(true);
-          apiClient.getMemberships().then((membershipsData) => {
-            setMemberships(membershipsData);
-            setLoading(false);
-          });
+          refreshMemberships();
         }}
       />
     </ChakraStack>
