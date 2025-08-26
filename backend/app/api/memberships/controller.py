@@ -68,7 +68,7 @@ async def delete_membership(
     membership_id: UUID,
     user_id: UUID = Depends(get_current_user_id),
 ):
-    """Delete (cancel) a membership."""
+    """Delete a membership and all its related meetings."""
     service = MembershipService()
     try:
         await service.delete_membership(user_id, membership_id)
