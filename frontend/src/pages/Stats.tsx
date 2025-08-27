@@ -104,6 +104,9 @@ const Stats: React.FC = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  // Add state for calculated date parameters to pass to modal
+  const [modalStartDate, setModalStartDate] = useState<string>('');
+  const [modalEndDate, setModalEndDate] = useState<string>('');
 
   // Responsive breakpoints
   const isMobile = useBreakpointValue({ base: true, md: false });
@@ -188,6 +191,10 @@ const Stats: React.FC = () => {
           startDateParam = toIsoNoMillis(startDateLocal);
           endDateParam = toIsoNoMillis(endDateLocal);
         }
+
+        // Set modal date parameters for the modal
+        setModalStartDate(startDateParam || '');
+        setModalEndDate(endDateParam || '');
 
         // Set service ID if not "all"
         if (selectedService !== 'all') {
@@ -1006,8 +1013,8 @@ const Stats: React.FC = () => {
             isOpen={modalOpen}
             onClose={() => setModalOpen(false)}
             clientId={selectedClientId || ''}
-            startDate={startDate}
-            endDate={endDate}
+            startDate={modalStartDate}
+            endDate={modalEndDate}
             serviceId={selectedService !== 'all' ? selectedService : undefined}
           />
         </Stack>
