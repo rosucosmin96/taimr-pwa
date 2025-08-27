@@ -128,10 +128,12 @@ const MembershipModal: React.FC<MembershipModalProps> = ({ isOpen, onClose, onSu
 
       onSuccess();
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
       toast({
         title: 'Failed to create membership',
+        description: errorMessage,
         status: 'error',
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       });
       console.error('Membership creation error:', err);

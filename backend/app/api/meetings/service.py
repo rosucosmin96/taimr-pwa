@@ -77,6 +77,19 @@ class MeetingService:
         self, user_id: UUID, meeting: MeetingCreateRequest
     ) -> MeetingResponse:
         """Create a new meeting"""
+        # Validate membership availability if membership is selected
+        if meeting.membership_id:
+            from app.api.memberships.service import MembershipService
+
+            membership_service = MembershipService()
+            is_available = await membership_service.check_membership_availability(
+                user_id, meeting.membership_id
+            )
+            if not is_available:
+                raise ValueError(
+                    "Selected membership has no available spots for new meetings"
+                )
+
         duration_hours = (meeting.end_time - meeting.start_time).total_seconds() / 3600
         price_total = duration_hours * meeting.price_per_hour
 

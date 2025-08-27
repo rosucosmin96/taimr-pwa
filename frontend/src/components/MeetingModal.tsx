@@ -179,7 +179,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
     });
   }, [serviceId]);
 
-  // Fetch active membership when client changes
+  // Fetch available active membership when client changes
   useEffect(() => {
     if (!clientId) {
       setActiveMembership(null);
@@ -188,7 +188,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
       return;
     }
 
-    apiClient.getActiveMembership(clientId).then((membership) => {
+    apiClient.getAvailableActiveMembership(clientId).then((membership) => {
       setActiveMembership(membership);
       setUseMembership(false); // Default to not using membership
 
@@ -337,11 +337,12 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
       onClose();
     } catch (err) {
       console.error('Error creating meeting:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
       toast({
         title: 'Failed to create meeting',
-        description: 'Please try again.',
+        description: errorMessage,
         status: 'error',
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       });
     } finally {

@@ -262,7 +262,17 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      // Try to extract error message from response body
+      let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.detail) {
+          errorMessage = errorData.detail;
+        }
+      } catch (e) {
+        // If we can't parse the response as JSON, use the default error message
+      }
+      throw new Error(errorMessage);
     }
 
     return response.json();
@@ -528,6 +538,10 @@ class ApiClient {
 
   async getActiveMembership(clientId: string): Promise<Membership | null> {
     return this.request<Membership | null>(`/memberships/active/${clientId}`);
+  }
+
+  async getAvailableActiveMembership(clientId: string): Promise<Membership | null> {
+    return this.request<Membership | null>(`/memberships/available/${clientId}`);
   }
 
   async getMembershipMeetings(membershipId: string): Promise<Meeting[]> {

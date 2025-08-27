@@ -318,6 +318,31 @@ class MembershipService:
         )
         return memberships[0] if memberships else None
 
+    async def get_available_active_membership(
+        self, user_id: UUID, client_id: UUID
+    ) -> MembershipResponse | None:
+        """Get the active membership for a client only if it has available spots."""
+        membership = await self._get_active_membership_by_client(user_id, client_id)
+        if not membership:
+            return None
+
+        # Check if membership has available spots
+        available_info = await self.get_membership_available_meetings(
+            user_id, membership.id
+        )
+        if available_info["available_meetings"] > 0:
+            return membership
+        return None
+
+    async def check_membership_availability(
+        self, user_id: UUID, membership_id: UUID
+    ) -> bool:
+        """Check if a membership has available spots for new meetings."""
+        available_info = await self.get_membership_available_meetings(
+            user_id, membership_id
+        )
+        return available_info["available_meetings"] > 0
+
     async def _get_done_meetings_count(self, membership_id: str) -> int:
         """Get the count of done meetings for a membership."""
         try:
