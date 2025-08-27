@@ -114,8 +114,10 @@ class RecurrenceService:
         membership_info = None
 
         if recurrence.use_membership:
-            active_membership = await membership_service.get_active_membership(
-                user_id, recurrence.client_id
+            active_membership = (
+                await membership_service.get_available_active_membership(
+                    user_id, recurrence.client_id
+                )
             )
 
         # Calculate how many meetings can be created
@@ -216,8 +218,10 @@ class RecurrenceService:
         membership_info = None
 
         if recurrence.use_membership:
-            active_membership = await membership_service.get_active_membership(
-                user_id, recurrence.client_id
+            active_membership = (
+                await membership_service.get_available_active_membership(
+                    user_id, recurrence.client_id
+                )
             )
 
         # Calculate how many meetings can be created

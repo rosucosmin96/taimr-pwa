@@ -45,9 +45,10 @@ async def create_meeting(
 ):
     """Create a new meeting"""
     service = MeetingService()
-    print(meeting.start_time)
-    print(meeting.end_time)
-    return await service.create_meeting(user_id, meeting)
+    try:
+        return await service.create_meeting(user_id, meeting)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.put("/{meeting_id}", response_model=MeetingResponse)

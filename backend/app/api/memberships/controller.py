@@ -87,6 +87,16 @@ async def get_active_membership(
     return await service.get_active_membership(user_id, client_id)
 
 
+@router.get("/available/{client_id}", response_model=MembershipResponse | None)
+async def get_available_active_membership(
+    client_id: UUID,
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """Get the active membership for a specific client only if it has available spots."""
+    service = MembershipService()
+    return await service.get_available_active_membership(user_id, client_id)
+
+
 @router.get("/{membership_id}/meetings")
 async def get_membership_meetings(
     membership_id: UUID,
