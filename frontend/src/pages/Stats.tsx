@@ -39,7 +39,7 @@ import {
 } from '@chakra-ui/react';
 import { apiClient, StatsOverview, Service, DailyBreakdownItem } from '../lib/api';
 import ClientStatisticsModal from '../components/ClientStatisticsModal';
-import { useCurrency } from '../lib/currency';
+import { useCurrency, roundToDecimals } from '../lib/currency';
 
 interface ServiceStats {
   serviceId: string;
@@ -245,9 +245,9 @@ const Stats: React.FC = () => {
                 doneMeetings,
                 canceledMeetings: stats.canceled_meetings,
                 totalRevenue,
-                pricePerHour: hours > 0 ? totalRevenue / hours : 0,
+                pricePerHour: hours > 0 ? roundToDecimals(totalRevenue / hours, 2) : 0,
                 hours,
-                pricePerMeeting: doneMeetings > 0 ? totalRevenue / doneMeetings : 0,
+                pricePerMeeting: doneMeetings > 0 ? roundToDecimals(totalRevenue / doneMeetings, 2) : 0,
                 // Optionally, you can add: meetings: item.meetings
               };
             }));

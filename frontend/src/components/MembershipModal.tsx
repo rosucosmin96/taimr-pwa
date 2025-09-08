@@ -27,7 +27,7 @@ import {
   NumberDecrementStepper,
 } from '@chakra-ui/react';
 import { apiClient, Service, Client } from '../lib/api';
-import { useCurrency } from '../lib/currency';
+import { useCurrency, roundToDecimals } from '../lib/currency';
 
 interface MembershipModalProps {
   isOpen: boolean;
@@ -54,7 +54,7 @@ const MembershipModal: React.FC<MembershipModalProps> = ({ isOpen, onClose, onSu
   // Calculate price per meeting
   const pricePerMeeting = useCallback(() => {
     if (!pricePerMembership || !totalMeetings) return 0;
-    return parseFloat(pricePerMembership) / totalMeetings;
+    return roundToDecimals(parseFloat(pricePerMembership) / totalMeetings, 2);
   }, [pricePerMembership, totalMeetings]);
 
   // Fetch services on open

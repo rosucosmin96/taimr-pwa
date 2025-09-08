@@ -129,7 +129,7 @@ class MembershipService:
 
         # Delete all related meetings first
         for meeting in meetings:
-            await self.meeting_storage.delete(user_id, UUID(meeting["id"]))
+            await self.meeting_storage.delete(user_id, meeting["id"])
 
         # Delete the membership
         deleted = await self.storage.delete(user_id, membership_id)
