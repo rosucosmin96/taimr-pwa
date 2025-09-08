@@ -190,7 +190,12 @@ class RecurrenceService:
         for _i, instance in enumerate(instances_to_create):
             # Use membership pricing if available and membership was requested
             if membership_info and _i < membership_info["available_meetings"]:
-                instance.price_per_hour = membership_info["price_per_meeting"]
+                instance_duration_hours = (
+                    instance.end_time - instance.start_time
+                ).total_seconds() / 3600
+                instance.price_per_hour = (
+                    membership_info["price_per_meeting"] / instance_duration_hours
+                )
                 instance.membership_id = membership_info["membership_id"]
 
             # Create meeting using MeetingService to ensure all business logic is applied
@@ -277,7 +282,12 @@ class RecurrenceService:
         for _i, instance in enumerate(instances_to_create):
             # Use membership pricing if available and membership was requested
             if membership_info and _i < membership_info["available_meetings"]:
-                instance.price_per_hour = membership_info["price_per_meeting"]
+                instance_duration_hours = (
+                    instance.end_time - instance.start_time
+                ).total_seconds() / 3600
+                instance.price_per_hour = (
+                    membership_info["price_per_meeting"] / instance_duration_hours
+                )
                 instance.membership_id = membership_info["membership_id"]
 
             # Create meeting using MeetingService to ensure all business logic is applied

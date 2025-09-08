@@ -115,6 +115,16 @@ export const getSupportedCurrencies = () => {
  */
 export const DEFAULT_CURRENCY: SupportedCurrency = 'USD';
 
+/**
+ * Round a number to a specified number of decimal places
+ * @param num - The number to round
+ * @param decimals - Number of decimal places (default: 2)
+ * @returns Rounded number
+ */
+export const roundToDecimals = (num: number, decimals: number = 2): number => {
+  return Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals);
+};
+
 // Custom hook for currency formatting with profile context
 import { useProfile } from '../contexts/ProfileContext';
 

@@ -29,7 +29,7 @@ import {
   AlertDescription,
 } from '@chakra-ui/react';
 import { apiClient, Service, Client, Membership, MembershipProgress } from '../lib/api';
-import { useCurrency } from '../lib/currency';
+import { useCurrency, roundToDecimals } from '../lib/currency';
 
 interface MeetingModalProps {
   isOpen: boolean;
@@ -97,13 +97,13 @@ const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, onSuccess 
   // Calculate price per meeting from price per hour
   const calculatePricePerMeeting = useCallback((hourlyRate: number) => {
     const durationHours = getMeetingDurationHours();
-    return hourlyRate * durationHours;
+    return roundToDecimals(hourlyRate * durationHours, 2);
   }, [getMeetingDurationHours]);
 
   // Calculate price per hour from price per meeting
   const calculatePricePerHour = useCallback((meetingPrice: number) => {
     const durationHours = getMeetingDurationHours();
-    return durationHours > 0 ? meetingPrice / durationHours : 0;
+    return durationHours > 0 ? roundToDecimals(meetingPrice / durationHours, 2) : 0;
   }, [getMeetingDurationHours]);
 
   // Handle price per hour change

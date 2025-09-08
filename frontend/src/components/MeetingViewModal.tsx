@@ -29,7 +29,7 @@ import {
 import { apiClient, Service, Client, Meeting } from '../lib/api';
 import RecurrenceUpdateDialog from './RecurrenceUpdateDialog';
 import RecurrenceDeleteDialog from './RecurrenceDeleteDialog';
-import { useCurrency } from '../lib/currency';
+import { useCurrency, roundToDecimals } from '../lib/currency';
 
 interface MeetingViewModalProps {
   isOpen: boolean;
@@ -90,13 +90,13 @@ const MeetingViewModal: React.FC<MeetingViewModalProps> = ({ isOpen, onClose, on
   // Calculate price per meeting from price per hour
   const calculatePricePerMeeting = useCallback((hourlyRate: number) => {
     const durationHours = getMeetingDurationHours();
-    return hourlyRate * durationHours;
+    return roundToDecimals(hourlyRate * durationHours, 2);
   }, [getMeetingDurationHours]);
 
   // Calculate price per hour from price per meeting
   const calculatePricePerHour = useCallback((meetingPrice: number) => {
     const durationHours = getMeetingDurationHours();
-    return durationHours > 0 ? meetingPrice / durationHours : 0;
+    return durationHours > 0 ? roundToDecimals(meetingPrice / durationHours, 2) : 0;
   }, [getMeetingDurationHours]);
 
   // Handle price per hour change
