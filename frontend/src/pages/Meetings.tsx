@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { CalendarDaysIcon, CheckCircleIcon, XCircleIcon, ClockIcon, MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, CheckCircleIcon, XCircleIcon, ClockIcon, MagnifyingGlassIcon, FunnelIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import {
   Box,
   Flex,
@@ -74,6 +74,11 @@ const Meetings: React.FC = () => {
   const [batchEditStatus, setBatchEditStatus] = useState<'upcoming' | 'done' | 'canceled'>('upcoming');
   const [batchEditPaid, setBatchEditPaid] = useState(false);
   const [batchLoading, setBatchLoading] = useState(false);
+
+  // Custom date range state
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const { isOpen: isCustomDateOpen, onOpen: onCustomDateOpen, onClose: onCustomDateClose } = useDisclosure();
 
   const openBatchEdit = () => {
     setBatchEditStatus('upcoming');
@@ -222,12 +227,20 @@ const Meetings: React.FC = () => {
             const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
             if (meetingDate < monthStart || meetingDate >= monthEnd) return false;
             break;
+          case 'custom':
+            if (!customStartDate || !customEndDate) return false;
+            const startDate = new Date(customStartDate);
+            const endDate = new Date(customEndDate);
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(23, 59, 59, 999);
+            if (meetingDate < startDate || meetingDate > endDate) return false;
+            break;
         }
       }
 
       return true;
     });
-  }, [meetings, filters, getClientName, getClientEmail, getServiceName]);
+  }, [meetings, filters, getClientName, getClientEmail, getServiceName, customStartDate, customEndDate]);
 
   const isAllSelected = filteredMeetings.length > 0 && filteredMeetings.every(m => selectedMeetingIds.includes(m.id));
   const isIndeterminate = selectedMeetingIds.length > 0 && !isAllSelected;
@@ -272,6 +285,12 @@ const Meetings: React.FC = () => {
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+
+    // Reset custom dates when changing away from custom
+    if (key === 'dateRange' && value !== 'custom') {
+      setCustomStartDate('');
+      setCustomEndDate('');
+    }
   };
 
   const clearFilters = () => {
@@ -282,9 +301,21 @@ const Meetings: React.FC = () => {
       paymentStatus: 'all',
       serviceId: ''
     });
+    setCustomStartDate('');
+    setCustomEndDate('');
   };
 
+  // Helper functions for custom date range
+  const handleCustomDateSelect = () => {
+    if (customStartDate && customEndDate) {
+      onCustomDateClose();
+    }
+  };
 
+  const formatCustomDateRange = () => {
+    if (!customStartDate || !customEndDate) return 'Select dates';
+    return `${customStartDate} to ${customEndDate}`;
+  };
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -399,6 +430,7 @@ const Meetings: React.FC = () => {
                     <option value="today">Today</option>
                     <option value="thisWeek">This Week</option>
                     <option value="thisMonth">This Month</option>
+                    <option value="custom">Custom Period</option>
                   </Select>
                 </Box>
 
@@ -443,6 +475,84 @@ const Meetings: React.FC = () => {
             </PopoverBody>
           </PopoverContent>
         </Popover>
+
+        {/* Custom Date Range Popover */}
+        {filters.dateRange === 'custom' && (
+          <Popover isOpen={isCustomDateOpen} onOpen={onCustomDateOpen} onClose={onCustomDateClose} placement="bottom-start">
+            <PopoverTrigger>
+              <Button
+                variant="outline"
+                bg="white"
+                w="full"
+                maxW="300px"
+                justifyContent="space-between"
+                size="sm"
+                borderRadius="lg"
+                border="1px solid"
+                borderColor="gray.200"
+                _hover={{ bg: 'gray.50' }}
+                rightIcon={<ChevronDownIcon style={{ width: 16, height: 16 }} />}
+                fontSize="sm"
+              >
+                {formatCustomDateRange()}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent p={4} w="400px">
+              <PopoverBody>
+                <VStack spacing={4}>
+                  <Text fontWeight="semibold" fontSize="sm">Select Date Range</Text>
+                  <VStack spacing={4} w="full">
+                    <VStack align="start" w="full">
+                      <Text fontSize="sm" fontWeight="medium">Start Date</Text>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        style={{
+                          padding: '12px 16px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '16px',
+                          width: '100%',
+                          outline: 'none'
+                        }}
+                      />
+                    </VStack>
+                    <VStack align="start" w="full">
+                      <Text fontSize="sm" fontWeight="medium">End Date</Text>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        style={{
+                          padding: '12px 16px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '16px',
+                          width: '100%',
+                          outline: 'none'
+                        }}
+                      />
+                    </VStack>
+                  </VStack>
+                  <HStack spacing={3} w="full" justify="flex-end">
+                    <Button size="sm" variant="ghost" onClick={onCustomDateClose}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      colorScheme="purple"
+                      onClick={handleCustomDateSelect}
+                      isDisabled={!customStartDate || !customEndDate}
+                    >
+                      Apply
+                    </Button>
+                  </HStack>
+                </VStack>
+              </PopoverBody>
+            </PopoverContent>
+          </Popover>
+        )}
       </Flex>
 
       {/* Batch action bar above the meeting list */}
