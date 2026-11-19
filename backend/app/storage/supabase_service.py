@@ -61,14 +61,23 @@ class SupabaseService(StorageServiceInterface[T]):
                     # Simple equality filter
                     query = query.eq(key, value)
 
-        # Apply ordering if specified
-        if order_by:
-            # Check if the field exists in the table schema
-            # For now, we'll assume created_at exists and order by it
+        # Pagination needs a stable order, including when sort values are equal.
+        if order_by and order_by != "id":
             query = query.order(order_by, desc=False)
+        query = query.order("id", desc=False)
 
-        result = query.execute()
-        return [self._to_response(record) for record in result.data]
+        # Supabase caps each response (1,000 rows by default). Keep reading
+        # until empty, even if the project cap is smaller than our page size.
+        records = []
+        page_size = 1000
+        offset = 0
+        while True:
+            result = query.range(offset, offset + page_size - 1).execute()
+            if not result.data:
+                break
+            records.extend(self._to_response(record) for record in result.data)
+            offset += len(result.data)
+        return records
 
     async def get_by_id(self, user_id: UUID, record_id: UUID) -> T | None:
         """Get a single record by ID."""
